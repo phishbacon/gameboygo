@@ -1,20 +1,18 @@
 package main
 
-import "fmt"
-// import "goboy/memory"
-import "goboy/cpu"
-
+import (
+	"fmt"
+	// import "goboy/memory"
+	"goboy/cpu"
+	"goboy/cpu/registers"
+)
 
 func main() {
   // RAM := memory.NewMemory()
-  CPU := cpu.NewCPU()
-  CPU.Registers.F = 0xF0
-  CPU.Registers.UnsetFlag(cpu.CARRY_FLAG)
-  CPU.Registers.UnsetFlag(cpu.SUBTRACTION_FLAG)
-  test := CPU.Registers.GetFlag(cpu.HALF_CARRY_FLAG)
-  fmt.Println(test)
-  test = CPU.Registers.GetFlag(cpu.CARRY_FLAG)
-  fmt.Println(test)
+  CPU := &cpu.CPU{}
+  CPU.Registers.F = 0
+  CPU.Registers.SetFlag(registers.ZERO_FLAG, true)
+  CPU.Registers.SetFlag(registers.ZERO_FLAG, false)
   fmt.Printf("%08b\n", CPU.Registers.F)
 }
 
