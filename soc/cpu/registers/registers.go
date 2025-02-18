@@ -18,6 +18,8 @@ type Registers struct {
 	F uint8 // Flags register znhc 0000 | Zero, Subtraction, Half Carry, Carry
 	H uint8
 	L uint8
+  SP uint16 // Stack Pointer
+  PC uint16 // Program Counter
 }
 
 // B = 00000001 C = 11110000 return 00000001 11110000
