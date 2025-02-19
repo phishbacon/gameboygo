@@ -1,73 +1,73 @@
 package cart
 
-var NewLicCodes = map[uint16]string{
-	12336: "None",
-	12337: "Nintendo Research & Development 1",
-	12344: "Capcom",
-	12595: "EA (Electronic Arts)",
-	12600: "Hudson Soft",
-	12601: "B-AI",
-	12848: "KSS",
-	12850: "Planning Office WADA",
-	12852: "PCM Complete",
-	12853: "San-X",
-	12856: "Kemco",
-	12857: "SETA Corporation",
-	13104: "Viacom",
-	13105: "Nintendo",
-	13106: "Bandai",
-	13107: "Ocean Software/Acclaim Entertainment",
-	13108: "Konami",
-	13109: "HectorSoft",
-	13111: "Taito",
-	13112: "Hudson Soft",
-	13113: "Banpresto",
-	13361: "Ubi Soft1",
-	13362: "Atlus",
-	13364: "Malibu Interactive",
-	13366: "Angel",
-	13367: "Bullet-Proof Software2",
-	13369: "Irem",
-	13616: "Absolute",
-	13617: "Acclaim Entertainment",
-	13618: "Activision",
-	13619: "Sammy USA Corporation",
-	13620: "Konami",
-	13621: "Hi Tech Expressions",
-	13622: "LJN",
-	13623: "Matchbox",
-	13624: "Mattel",
-	13625: "Milton Bradley Company",
-	13872: "Titus Interactive",
-	13873: "Virgin Games Ltd.3",
-	13876: "Lucasfilm Games4",
-	13879: "Ocean Software",
-	13881: "EA (Electronic Arts)",
-	14128: "Infogrames5",
-	14129: "Interplay Entertainment",
-	14130: "Broderbund",
-	14131: "Sculptured Software6",
-	14133: "The Sales Curve Limited7",
-	14136: "THQ",
-	14137: "Accolade",
-	14384: "Misawa Entertainment",
-	14387: "lozc",
-	14390: "Tokuma Shoten",
-	14391: "Tsukuda Original",
-	14641: "Chunsoft Co.8",
-	14642: "Video System",
-	14643: "Ocean Software/Acclaim Entertainment",
-	14645: "Varie",
-	14646: "Yonezawa/s’pal",
-	14647: "Kaneko",
-	14649: "Pack-In-Video",
-	14664: "Bottom Up",
-	16692: "Konami (Yu-Gi-Oh!)",
-	16972: "MTO",
-	17483: "Kodansha",
+var NewLicCodes = map[string]string{
+	"00": "None",
+	"01": "Nintendo Research & Development 1",
+	"08": "Capcom",
+	"13": "EA (Electronic Arts)",
+	"18": "Hudson Soft",
+	"19": "B-AI",
+	"20": "KSS",
+	"22": "Planning Office WADA",
+	"24": "PCM Complete",
+	"25": "San-X",
+	"28": "Kemco",
+	"29": "SETA Corporation",
+	"30": "Viacom",
+	"31": "Nintendo",
+	"32": "Bandai",
+	"33": "Ocean Software/Acclaim Entertainment",
+	"34": "Konami",
+	"35": "HectorSoft",
+	"37": "Taito",
+	"38": "Hudson Soft",
+	"39": "Banpresto",
+	"41": "Ubi Soft1",
+	"42": "Atlus",
+	"44": "Malibu Interactive",
+	"46": "Angel",
+	"47": "Bullet-Proof Software2",
+	"49": "Irem",
+	"50": "Absolute",
+	"51": "Acclaim Entertainment",
+	"52": "Activision",
+	"53": "Sammy USA Corporation",
+	"54": "Konami",
+	"55": "Hi Tech Expressions",
+	"56": "LJN",
+	"57": "Matchbox",
+	"58": "Mattel",
+	"59": "Milton Bradley Company",
+	"60": "Titus Interactive",
+	"61": "Virgin Games Ltd.3",
+	"64": "Lucasfilm Games4",
+	"67": "Ocean Software",
+	"69": "EA (Electronic Arts)",
+	"70": "Infogrames5",
+	"71": "Interplay Entertainment",
+	"72": "Broderbund",
+	"73": "Sculptured Software6",
+	"75": "The Sales Curve Limited7",
+	"78": "THQ",
+	"79": "Accolade",
+	"80": "Misawa Entertainment",
+	"83": "lozc",
+	"86": "Tokuma Shoten",
+	"87": "Tsukuda Original",
+	"91": "Chunsoft Co.8",
+	"92": "Video System",
+	"93": "Ocean Software/Acclaim Entertainment",
+	"95": "Varie",
+	"96": "Yonezawa/s’pal",
+	"97": "Kaneko",
+	"99": "Pack-In-Video",
+	"9H": "Bottom Up",
+	"A4": "Konami (Yu-Gi-Oh!)",
+	"BL": "MTO",
+	"DK": "Kodansha",
 }
 
-var Types = map[uint8]string{
+var Types = map[byte]string{
 	0x00: "ROM ONLY",
 	0x01: "MBC1",
 	0x02: "MBC1+RAM",
@@ -92,11 +92,24 @@ var Types = map[uint8]string{
 	0x22: "MBC7+SENSOR+RUMBLE+RAM+BATTERY",
 }
 
-type Cart struct {
+var RAMSizes = map[byte]string{
+	0x00: "0",
+	0x02: "8 KB",
+	0x03: "32 KB",
+	0x04: "128 KB",
+	0x05: "64 KB",
+}
+
+var DestCodes = map[byte]string{
+	0x00: "Japan",
+	0x01: "Not Japan",
+}
+
+type CartHeader struct {
 	Entry          [0x0004]uint8
 	Logo           [0x0030]uint8
-	Title          [0x0010]byte
-	NewLicCode     uint16
+	Title          [0x0010]uint8
+	NewLicCode     [0x0002]uint8
 	SGBFlag        uint8
 	Type           uint8
 	ROMSize        uint8
@@ -108,18 +121,37 @@ type Cart struct {
 	GlobalChecksum uint8
 }
 
-func (c Cart) GetCartLicName() string {
-	if code, ok := NewLicCodes[c.NewLicCode]; ok {
+type Cart []byte
+
+func (c CartHeader) GetCartLicName() string {
+  ascii := string(c.NewLicCode[:])
+	if code, ok := NewLicCodes[ascii]; ok {
 		return code
 	} else {
 		return "UNKOWN LICENSE CODE"
 	}
 }
 
-func (c Cart) GetCartTypeName() string {
-  if t, ok := Types[c.Type]; ok {
-    return t
-  } else {
-    return "UNKNOWN TYPE"
-  }
+func (c CartHeader) GetCartTypeName() string {
+	if t, ok := Types[c.Type]; ok {
+		return t
+	} else {
+		return "UNKNOWN TYPE"
+	}
+}
+
+func (c CartHeader) GetRAMSize() string {
+	if size, ok := RAMSizes[c.ROMSize]; ok {
+		return size
+	} else {
+		return "UNKNOWN RAM SIZE"
+	}
+}
+
+func (c CartHeader) GetDestCode() string {
+	if dc, ok := DestCodes[c.DestCode]; ok {
+		return dc
+	} else {
+		return "UNKNOWN DEST CODE"
+	}
 }
