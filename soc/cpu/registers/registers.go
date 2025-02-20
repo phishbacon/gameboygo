@@ -1,12 +1,12 @@
 package registers
 
-type flagMask uint8
+type FlagMask uint8
 
 const (
-	ZERO_FLAG        flagMask = 0b10000000
-	SUBTRACTION_FLAG flagMask = 0b01000000
-	HALF_CARRY_FLAG  flagMask = 0b00100000
-	CARRY_FLAG       flagMask = 0b00010000
+	ZERO_FLAG        FlagMask = 0b10000000
+	SUBTRACTION_FLAG FlagMask = 0b01000000
+	HALF_CARRY_FLAG  FlagMask = 0b00100000
+	CARRY_FLAG       FlagMask = 0b00010000
 )
 
 type Registers struct {
@@ -86,7 +86,7 @@ func (r *Registers) SetHL(input uint16) {
 }
 
 // Returns true if the flag is flipped, false otherwise
-func (r Registers) GetFlag(flag flagMask) bool {
+func (r Registers) GetFlag(flag FlagMask) bool {
   if (r.F & uint8(flag) > 0) {
     return true
   } else {
@@ -95,7 +95,7 @@ func (r Registers) GetFlag(flag flagMask) bool {
 }
 
 // Sets the given flag to true or false
-func (r *Registers) SetFlag(flag flagMask, flipped bool) {
+func (r *Registers) SetFlag(flag FlagMask, flipped bool) {
   if (flipped) {
     r.F = r.F | uint8(flag)
   } else if (!flipped) {

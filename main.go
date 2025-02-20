@@ -7,6 +7,7 @@ import (
 	"goboy/cart"
 	"goboy/soc"
 	"os"
+  "goboy/util"
 )
 
 type goboy struct {
@@ -18,7 +19,7 @@ type goboy struct {
 }
 
 func (g *goboy) Start() {
-	g.soc = soc.NewSOC()
+	g.soc = soc.NewSOC(&g.cart)
 	g.running = true
 	g.paused = false
 	g.ticks = 0
@@ -47,6 +48,15 @@ func (g *goboy) LoadCart(fileName string) {
 	fmt.Printf("RAM SIZE   %s\n", cartHeader.GetRAMSize())
 	fmt.Printf("DEST CODE  %s\n", cartHeader.GetDestCode())
 	fmt.Printf("VERSION    %d\n", cartHeader.Version)
+
+  var checksum uint8 = 0;
+  for address := 0x0134; address <= 0x014C; address++ {
+    checksum = checksum - g.cart[address] - 1;
+  }
+
+  checksumPassed := util.If(cartHeader.HeaderChecksum == (checksum & 0x00FF), "PASSED", "FAILED")
+  fmt.Printf("CHECKSUM   %s\n", checksumPassed)
+  util.DumpHex(g.cart)
 }
 
 func main() {
@@ -57,7 +67,16 @@ func main() {
 	}
 
 	goboy := goboy{}
+	goboy.LoadCart(args[1])
 	goboy.Start()
 	fmt.Printf("Loading %s\n", args[1])
-	goboy.LoadCart(args[1])
+
+
+  // for goboy.running {
+  //   if (goboy.paused) {
+  //     continue;
+  //   }
+  //
+  //   goboy.ticks++
+  // }
 }

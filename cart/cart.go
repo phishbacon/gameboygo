@@ -1,5 +1,7 @@
 package cart
 
+import "goboy/util"
+
 var NewLicCodes = map[string]string{
 	"00": "None",
 	"01": "Nintendo Research & Development 1",
@@ -67,7 +69,7 @@ var NewLicCodes = map[string]string{
 	"DK": "Kodansha",
 }
 
-var Types = map[byte]string{
+var Types = map[uint8]string{
 	0x00: "ROM ONLY",
 	0x01: "MBC1",
 	0x02: "MBC1+RAM",
@@ -92,7 +94,7 @@ var Types = map[byte]string{
 	0x22: "MBC7+SENSOR+RUMBLE+RAM+BATTERY",
 }
 
-var RAMSizes = map[byte]string{
+var RAMSizes = map[uint8]string{
 	0x00: "0",
 	0x02: "8 KB",
 	0x03: "32 KB",
@@ -100,7 +102,7 @@ var RAMSizes = map[byte]string{
 	0x05: "64 KB",
 }
 
-var DestCodes = map[byte]string{
+var DestCodes = map[uint8]string{
 	0x00: "Japan",
 	0x01: "Not Japan",
 }
@@ -154,4 +156,12 @@ func (c CartHeader) GetDestCode() string {
 	} else {
 		return "UNKNOWN DEST CODE"
 	}
+}
+
+func (c Cart) Read(address uint16) uint8 {
+  return c[address];
+}
+
+func (c Cart) Write(address uint16, value uint8) {
+  util.NotImplemented()
 }
