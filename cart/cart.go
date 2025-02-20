@@ -126,7 +126,7 @@ type CartHeader struct {
 type Cart []byte
 
 func (c CartHeader) GetCartLicName() string {
-  ascii := string(c.NewLicCode[:])
+	ascii := string(c.NewLicCode[:])
 	if code, ok := NewLicCodes[ascii]; ok {
 		return code
 	} else {
@@ -159,9 +159,9 @@ func (c CartHeader) GetDestCode() string {
 }
 
 func (c Cart) Read(address uint16) uint8 {
-  return c[address];
+	return c[address]
 }
 
 func (c Cart) Write(address uint16, value uint8) {
-  util.NotImplemented()
+	util.NotImplemented()
 }

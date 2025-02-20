@@ -10,16 +10,16 @@ const (
 )
 
 type Registers struct {
-	A uint8
-	B uint8
-	C uint8
-	D uint8
-	E uint8
-	F uint8 // Flags register znhc 0000 | Zero, Subtraction, Half Carry, Carry
-	H uint8
-	L uint8
-  SP uint16 // Stack Pointer
-  PC uint16 // Program Counter
+	A  uint8
+	B  uint8
+	C  uint8
+	D  uint8
+	E  uint8
+	F  uint8 // Flags register znhc 0000 | Zero, Subtraction, Half Carry, Carry
+	H  uint8
+	L  uint8
+	SP uint16 // Stack Pointer
+	PC uint16 // Program Counter
 }
 
 // B = 00000001 C = 11110000 return 00000001 11110000
@@ -87,25 +87,25 @@ func (r *Registers) SetHL(input uint16) {
 
 // Returns true if the flag is flipped, false otherwise
 func (r Registers) GetFlag(flag FlagMask) bool {
-  if (r.F & uint8(flag) > 0) {
-    return true
-  } else {
-    return false
-  }
+	if r.F&uint8(flag) > 0 {
+		return true
+	} else {
+		return false
+	}
 }
 
 // Sets the given flag to true or false
 func (r *Registers) SetFlag(flag FlagMask, flipped bool) {
-  if (flipped) {
-    r.F = r.F | uint8(flag)
-  } else if (!flipped) {
-    // F
-    // 11110000
-    // 01000000 SUBTRACTION_FLAG
-    // (^SUBTRACTION_FLAG & 11110000) = 10110000
-    // 11110000
-    //&10110000
-    // 10110000
-    r.F = r.F & (^uint8(flag) & 0xF0)
-  }
+	if flipped {
+		r.F = r.F | uint8(flag)
+	} else if !flipped {
+		// F
+		// 11110000
+		// 01000000 SUBTRACTION_FLAG
+		// (^SUBTRACTION_FLAG & 11110000) = 10110000
+		// 11110000
+		//&10110000
+		// 10110000
+		r.F = r.F & (^uint8(flag) & 0xF0)
+	}
 }

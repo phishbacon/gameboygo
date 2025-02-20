@@ -3,7 +3,7 @@ package ppu
 import "goboy/bus"
 
 type PPU struct {
-  Bus *bus.Bus
+	Bus *bus.Bus
 }
 
 func NewPPU(bus *bus.Bus) PPU {

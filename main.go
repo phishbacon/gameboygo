@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"goboy/cart"
 	"goboy/soc"
+	"goboy/util"
 	"os"
-  "goboy/util"
 )
 
 type goboy struct {
@@ -38,25 +38,25 @@ func (g *goboy) LoadCart(fileName string) {
 		fmt.Print(headerErr)
 	}
 
-  fmt.Print(cartHeader)
+	fmt.Print(cartHeader)
 
 	fmt.Printf("\nTITLE      %s\n", string(cartHeader.Title[:]))
 	fmt.Printf("LIC        %s\n", cartHeader.GetCartLicName())
 	fmt.Printf("SGB        %x\n", cartHeader.SGBFlag)
 	fmt.Printf("TYPE       %s\n", cartHeader.GetCartTypeName())
-	fmt.Printf("ROM SIZE   %d KB\n", 32 << cartHeader.ROMSize)
+	fmt.Printf("ROM SIZE   %d KB\n", 32<<cartHeader.ROMSize)
 	fmt.Printf("RAM SIZE   %s\n", cartHeader.GetRAMSize())
 	fmt.Printf("DEST CODE  %s\n", cartHeader.GetDestCode())
 	fmt.Printf("VERSION    %d\n", cartHeader.Version)
 
-  var checksum uint8 = 0;
-  for address := 0x0134; address <= 0x014C; address++ {
-    checksum = checksum - g.cart[address] - 1;
-  }
+	var checksum uint8 = 0
+	for address := 0x0134; address <= 0x014C; address++ {
+		checksum = checksum - g.cart[address] - 1
+	}
 
-  checksumPassed := util.If(cartHeader.HeaderChecksum == (checksum & 0x00FF), "PASSED", "FAILED")
-  fmt.Printf("CHECKSUM   %s\n", checksumPassed)
-  util.DumpHex(g.cart)
+	checksumPassed := util.If(cartHeader.HeaderChecksum == (checksum&0x00FF), "PASSED", "FAILED")
+	fmt.Printf("CHECKSUM   %s\n", checksumPassed)
+	util.DumpHex(g.cart)
 }
 
 func main() {
@@ -71,12 +71,11 @@ func main() {
 	goboy.Start()
 	fmt.Printf("Loading %s\n", args[1])
 
-
-  // for goboy.running {
-  //   if (goboy.paused) {
-  //     continue;
-  //   }
-  //
-  //   goboy.ticks++
-  // }
+	// for goboy.running {
+	//   if (goboy.paused) {
+	//     continue;
+	//   }
+	//
+	//   goboy.ticks++
+	// }
 }
