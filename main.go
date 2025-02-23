@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"goboy/bus"
 	"goboy/cart"
 	"goboy/soc"
 	"goboy/util"
@@ -11,15 +12,23 @@ import (
 )
 
 type goboy struct {
-	soc     soc.SOC
-	cart    cart.Cart
+	soc     *soc.SOC
 	paused  bool
 	running bool
 	ticks   uint64
+	bus     *bus.Bus
+	cart    *cart.Cart
+}
+
+func NewGoboy() *goboy {
+	bus := new(bus.Bus)
+	return &goboy{
+		bus: bus,
+		soc: soc.NewSOC(bus),
+	}
 }
 
 func (g *goboy) Start() {
-	g.soc = soc.NewSOC(&g.cart)
 	g.running = true
 	g.paused = false
 	g.ticks = 0
@@ -29,13 +38,17 @@ func (g *goboy) LoadCart(fileName string) {
 	dump, dumpErr := os.ReadFile(fileName)
 	if dumpErr != nil {
 		fmt.Print(dumpErr)
+		os.Exit(-1)
 	}
-	g.cart = dump
+	// give bus reference to cart so soc components can read from it
+	g.cart = (*cart.Cart)(&dump)
+	g.bus.ConnectCart(&dump)
 
 	var cartHeader cart.CartHeader
-	headerErr := binary.Read(bytes.NewReader(g.cart[0x0100:0x0150]), binary.LittleEndian, &cartHeader)
+	headerErr := binary.Read(bytes.NewReader((*g.cart)[0x0100:0x0150]), binary.LittleEndian, &cartHeader)
 	if headerErr != nil {
 		fmt.Print(headerErr)
+		os.Exit(-1)
 	}
 
 	fmt.Print(cartHeader)
@@ -51,12 +64,12 @@ func (g *goboy) LoadCart(fileName string) {
 
 	var checksum uint8 = 0
 	for address := 0x0134; address <= 0x014C; address++ {
-		checksum = checksum - g.cart[address] - 1
+		checksum = checksum - (*g.cart)[address] - 1
 	}
 
 	checksumPassed := util.If(cartHeader.HeaderChecksum == (checksum&0x00FF), "PASSED", "FAILED")
 	fmt.Printf("CHECKSUM   %s\n", checksumPassed)
-	util.DumpHex(g.cart)
+	g.cart.DumpHex()
 }
 
 func main() {
@@ -66,16 +79,21 @@ func main() {
 		os.Exit(-1)
 	}
 
-	goboy := goboy{}
+	goboy := NewGoboy()
 	goboy.LoadCart(args[1])
 	goboy.Start()
 	fmt.Printf("Loading %s\n", args[1])
+	if goboy.cart.VerifyLogoDump() {
+		// jump to address 0x0100
+	} else {
+		fmt.Println("Failed to verify logo")
+		os.Exit(-1)
+	}
 
-	// for goboy.running {
-	//   if (goboy.paused) {
-	//     continue;
-	//   }
-	//
-	//   goboy.ticks++
-	// }
+	for goboy.running {
+		if goboy.paused {
+			continue
+		}
+		goboy.ticks++
+	}
 }

@@ -1,6 +1,10 @@
 package cart
 
-import "goboy/util"
+import (
+	"fmt"
+	"goboy/util"
+	"os"
+)
 
 var NewLicCodes = map[string]string{
 	"00": "None",
@@ -69,7 +73,7 @@ var NewLicCodes = map[string]string{
 	"DK": "Kodansha",
 }
 
-var Types = map[uint8]string{
+var Types = [0x23]string{
 	0x00: "ROM ONLY",
 	0x01: "MBC1",
 	0x02: "MBC1+RAM",
@@ -94,7 +98,7 @@ var Types = map[uint8]string{
 	0x22: "MBC7+SENSOR+RUMBLE+RAM+BATTERY",
 }
 
-var RAMSizes = map[uint8]string{
+var RAMSizes = [0x06]string{
 	0x00: "0",
 	0x02: "8 KB",
 	0x03: "32 KB",
@@ -102,9 +106,15 @@ var RAMSizes = map[uint8]string{
 	0x05: "64 KB",
 }
 
-var DestCodes = map[uint8]string{
+var DestCodes = [0x02]string{
 	0x00: "Japan",
 	0x01: "Not Japan",
+}
+
+var Logo = [0x30]byte{
+	0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+	0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+	0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
 }
 
 type CartHeader struct {
@@ -135,33 +145,60 @@ func (c CartHeader) GetCartLicName() string {
 }
 
 func (c CartHeader) GetCartTypeName() string {
-	if t, ok := Types[c.Type]; ok {
-		return t
+	if c.Type < uint8(len(Types)) && Types[c.Type] != "" {
+		return Types[c.Type]
 	} else {
 		return "UNKNOWN TYPE"
 	}
 }
 
 func (c CartHeader) GetRAMSize() string {
-	if size, ok := RAMSizes[c.ROMSize]; ok {
-		return size
+	if c.RAMSize < uint8(len(RAMSizes)) && RAMSizes[c.RAMSize] != "" {
+		return RAMSizes[c.RAMSize]
 	} else {
 		return "UNKNOWN RAM SIZE"
 	}
 }
 
 func (c CartHeader) GetDestCode() string {
-	if dc, ok := DestCodes[c.DestCode]; ok {
-		return dc
+	if c.DestCode < uint8(len(DestCodes)) && DestCodes[c.DestCode] != "" {
+		return DestCodes[c.DestCode]
 	} else {
 		return "UNKNOWN DEST CODE"
 	}
 }
 
-func (c Cart) Read(address uint16) uint8 {
-	return c[address]
+func (c *Cart) Read(address uint16) uint8 {
+	return (*c)[address]
 }
 
-func (c Cart) Write(address uint16, value uint8) {
+func (c *Cart) Write(address uint16, value uint8) {
 	util.NotImplemented()
+}
+
+func (c *Cart) DumpHex() {
+	fo, err := os.Create("dump.txt")
+	if err != nil {
+		fmt.Print(err)
+	}
+
+	defer fo.Close()
+	cart := *c
+	for i := 0; i < len(cart)-16; i += 16 {
+		str := fmt.Sprintf("0x%04x: ", i)
+		str += fmt.Sprintf("%02x %02x %02x %02x ", cart[i], cart[i+1], cart[i+2], cart[i+3])
+		str += fmt.Sprintf("%02x %02x %02x %02x ", cart[i+4], cart[i+5], cart[i+6], cart[i+7])
+		str += fmt.Sprintf("%02x %02x %02x %02x ", cart[i+8], cart[i+9], cart[i+10], cart[i+11])
+		str += fmt.Sprintf("%02x %02x %02x %02x\n", cart[i+12], cart[i+13], cart[i+14], cart[i+15])
+		fo.WriteString(str)
+	}
+}
+
+func (c *Cart) VerifyLogoDump() bool {
+	for i := range 0x30 {
+		if (*c)[i+0x0104] != Logo[i] {
+			return false
+		}
+	}
+	return true
 }

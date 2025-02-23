@@ -1,43 +1,58 @@
 package soc
 
 import (
+	"goboy/apu"
 	"goboy/bus"
-	"goboy/cart"
-	"goboy/soc/apu"
-	"goboy/soc/cpu"
-	"goboy/soc/ppu"
+	"goboy/cpu"
+	"goboy/ppu"
 	"goboy/util"
 )
 
+type ComponentEnum uint8
+
+const (
+	APU ComponentEnum = 0
+	CPU ComponentEnum = 1
+	PPU ComponentEnum = 2
+)
+
 type SOC struct {
-	cpu  cpu.CPU
-	apu  apu.APU
-	ppu  ppu.PPU
-	cart *cart.Cart
+	APU apu.APU
+	CPU cpu.CPU
+	PPU ppu.PPU
 }
 
-func NewSOC(cart *cart.Cart) SOC {
-	bus := bus.Bus{}
-	soc := SOC{
-		cpu:  cpu.NewCPU(&bus),
-		apu:  apu.NewAPU(&bus),
-		ppu:  ppu.NewPPU(&bus),
-		cart: cart,
+func NewSOC(bus *bus.Bus) *SOC {
+	return &SOC{
+		APU: *apu.NewAPU(bus),
+		CPU: *cpu.NewCPU(bus),
+		PPU: *ppu.NewPPU(bus),
 	}
-
-	return soc
 }
 
-func (s SOC) BusRead(address uint16) uint8 {
-	if address < 0x8000 {
-		return s.cart.Read(address)
+// only for the cpu right now
+func (s *SOC) Read(address uint16, component ComponentEnum) uint8 {
+	switch component {
+	case APU:
+		return util.NotImplemented()
+	case CPU:
+		return s.CPU.Read(address)
+	case PPU:
+		return util.NotImplemented()
+	default:
+		return util.NotImplemented()
 	}
-
-	return util.NotImplemented()
 }
 
-func (s SOC) BusWrite(address uint16, value uint8) {
-	if address < 0x8000 {
-		s.cart.Write(address, value)
+func (s *SOC) Write(address uint16, value uint8, component ComponentEnum) {
+	switch component {
+	case APU:
+		util.NotImplemented()
+	case CPU:
+		s.CPU.Write(address, value)
+	case PPU:
+		util.NotImplemented()
+	default:
+		util.NotImplemented()
 	}
 }

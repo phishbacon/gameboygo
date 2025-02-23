@@ -23,7 +23,7 @@ type Registers struct {
 }
 
 // B = 00000001 C = 11110000 return 00000001 11110000
-func (r Registers) GetBC() uint16 {
+func (r *Registers) GetBC() uint16 {
 	return (uint16(r.B) << 8) | uint16(r.C)
 }
 
@@ -44,7 +44,7 @@ func (r *Registers) SetBC(input uint16) {
 }
 
 // D = 00000001 E = 11110000 return 00000001 11110000
-func (r Registers) GetDE() uint16 {
+func (r *Registers) GetDE() uint16 {
 	return (uint16(r.D) << 8) | uint16(r.E)
 }
 
@@ -65,7 +65,7 @@ func (r *Registers) SetDE(input uint16) {
 }
 
 // H = 00000001 L = 11110000 return 00000001 11110000
-func (r Registers) GetHL() uint16 {
+func (r *Registers) GetHL() uint16 {
 	return (uint16(r.H) << 8) | uint16(r.L)
 }
 
@@ -86,7 +86,7 @@ func (r *Registers) SetHL(input uint16) {
 }
 
 // Returns true if the flag is flipped, false otherwise
-func (r Registers) GetFlag(flag FlagMask) bool {
+func (r *Registers) GetFlag(flag FlagMask) bool {
 	if r.F&uint8(flag) > 0 {
 		return true
 	} else {
