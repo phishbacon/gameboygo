@@ -2,7 +2,6 @@ package cart
 
 import (
 	"fmt"
-	"goboy/util"
 	"os"
 )
 
@@ -173,7 +172,7 @@ func (c *Cart) Read(address uint16) uint8 {
 }
 
 func (c *Cart) Write(address uint16, value uint8) {
-	util.NotImplemented()
+  (*c)[address] = value
 }
 
 func (c *Cart) DumpHex() {

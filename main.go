@@ -22,6 +22,8 @@ type goboy struct {
 
 func NewGoboy() *goboy {
 	bus := new(bus.Bus)
+  bus.InitHRAM()
+
 	return &goboy{
 		bus: bus,
 		soc: soc.NewSOC(bus),
@@ -29,9 +31,19 @@ func NewGoboy() *goboy {
 }
 
 func (g *goboy) Start() {
+  g.soc.Init()
+
 	g.running = true
 	g.paused = false
 	g.ticks = 0
+
+	for g.running {
+		if g.paused {
+			continue
+		}
+    g.soc.Step()
+		g.ticks++
+	}
 }
 
 func (g *goboy) LoadCart(fileName string) {
@@ -50,8 +62,6 @@ func (g *goboy) LoadCart(fileName string) {
 		fmt.Print(headerErr)
 		os.Exit(-1)
 	}
-
-	fmt.Print(cartHeader)
 
 	fmt.Printf("\nTITLE      %s\n", string(cartHeader.Title[:]))
 	fmt.Printf("LIC        %s\n", cartHeader.GetCartLicName())
@@ -81,7 +91,7 @@ func main() {
 
 	goboy := NewGoboy()
 	goboy.LoadCart(args[1])
-	goboy.Start()
+
 	fmt.Printf("Loading %s\n", args[1])
 	if goboy.cart.VerifyLogoDump() {
 		// jump to address 0x0100
@@ -90,10 +100,6 @@ func main() {
 		os.Exit(-1)
 	}
 
-	for goboy.running {
-		if goboy.paused {
-			continue
-		}
-		goboy.ticks++
-	}
+	goboy.Start()
+
 }

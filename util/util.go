@@ -6,7 +6,7 @@ import (
 )
 
 func NotImplemented() uint8 {
-	fmt.Println("Not implemented")
+	fmt.Println("Not implemented!!")
 	os.Exit(-1)
 	return 1
 }

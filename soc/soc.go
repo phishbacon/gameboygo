@@ -30,6 +30,18 @@ func NewSOC(bus *bus.Bus) *SOC {
 	}
 }
 
+func (s *SOC) Init() {
+  s.CPU.Init()
+  // s.APU.Init()
+  // s.PPU.Init()
+}
+
+func (s *SOC) Step() {
+  s.CPU.Step()
+  // s.APU.Step()
+  // s.PPU.Step()
+}
+
 // only for the cpu right now
 func (s *SOC) Read(address uint16, component ComponentEnum) uint8 {
 	switch component {

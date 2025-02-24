@@ -85,6 +85,27 @@ func (r *Registers) SetHL(input uint16) {
 	r.L = uint8(input & 0x00FF)
 }
 
+// A = 00000001 F = 11110000 return 00000001 11110000
+func (r *Registers) GetAF() uint16 {
+	return (uint16(r.A) << 8) | uint16(r.F)
+}
+
+// input = 00000001 11110000 A = 00000001, F = 11110000
+func (r *Registers) SetAF(input uint16) {
+	// A
+	// 0000000111110000
+	//&1111111100000000
+	// 0000000100000000
+	// >> 8
+	// 0000000000000001
+	// F
+	// 0000000111110000
+	//&0000000011111111
+	// 0000000011110000
+	r.A = uint8((input & 0xFF00) >> 8)
+	r.F = uint8(input & 0x00FF)
+}
+
 // Returns true if the flag is flipped, false otherwise
 func (r *Registers) GetFlag(flag FlagMask) bool {
 	if r.F&uint8(flag) > 0 {
