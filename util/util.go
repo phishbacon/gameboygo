@@ -11,8 +11,8 @@ func NotImplemented() uint8 {
 	return 1
 }
 
-func NilRegister(register string) uint8 {
-	fmt.Printf("Can't read/write %s as it doesn't exist\n", register)
+func NilRegister(address uint16) uint8 {
+	fmt.Printf("Can't read/write to %04x\n", address)
 	os.Exit(-1)
 	return 1
 }

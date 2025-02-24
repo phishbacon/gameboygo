@@ -24,35 +24,13 @@ func (b *Bus) Read(address uint16) uint8 {
 		if b.cart != nil {
 			return b.cart.Read(address)
 		} else {
-			return util.NilRegister("cart")
+			return util.NilRegister(address)
 		}
 	}
-
-  if address >= 0xFF80 && address <= 0xFFFE {
-    if b.HRAM != nil {
-      return b.HRAM[address - 0xFF80]
-    } else {
-      return util.NilRegister("HRAM")
-    }
-  }
 
 	return util.NotImplemented()
 }
 
 func (b *Bus) Write(address uint16, value uint8) {
-	if address < 0x8000 {
-		if b.cart != nil {
-			b.cart.Write(address, value)
-		} else {
-			util.NilRegister("cart")
-		}
-	}
-
-  if address >= 0xFF80 && address <= 0xFFFE {
-    if b.HRAM != nil {
-      b.HRAM[address - 0xFF80] = value
-    } else {
-      util.NilRegister("HRAM")
-    }
-  }
+  util.NilRegister(address)
 }
