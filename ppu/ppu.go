@@ -1,13 +1,9 @@
 package ppu
 
-import "goboy/bus"
-
 type PPU struct {
-	bus *bus.Bus
 }
 
-func NewPPU(bus *bus.Bus) *PPU {
+func NewPPU() *PPU {
 	return &PPU{
-		bus: bus,
 	}
 }

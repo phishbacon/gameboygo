@@ -10,16 +10,17 @@ const (
 )
 
 type Registers struct {
-	A  uint8
-	B  uint8
-	C  uint8
-	D  uint8
-	E  uint8
-	F  uint8 // Flags register znhc 0000 | Zero, Subtraction, Half Carry, Carry
-	H  uint8
-	L  uint8
-	SP uint16 // Stack Pointer
-	PC uint16 // Program Counter
+	A   uint8
+	B   uint8
+	C   uint8
+	D   uint8
+	E   uint8
+	F   uint8 // Flags register znhc 0000 | Zero, Subtraction, Half Carry, Carry
+	H   uint8
+	L   uint8
+	SP  uint16 // Stack Pointer
+	PC  uint16 // Program Counter
+	IME bool   // Interrupt master enable
 }
 
 // B = 00000001 C = 11110000 return 00000001 11110000

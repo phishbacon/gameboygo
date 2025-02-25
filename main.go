@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"goboy/bus"
 	"goboy/cart"
 	"goboy/soc"
 	"goboy/util"
@@ -16,17 +15,13 @@ type goboy struct {
 	paused  bool
 	running bool
 	ticks   uint64
-	bus     *bus.Bus
 	cart    *cart.Cart
 }
 
 func NewGoboy() *goboy {
-	bus := new(bus.Bus)
-  bus.InitHRAM()
 
 	return &goboy{
-		bus: bus,
-		soc: soc.NewSOC(bus),
+		soc: soc.NewSOC(),
 	}
 }
 
@@ -54,7 +49,7 @@ func (g *goboy) LoadCart(fileName string) {
 	}
 	// give bus reference to cart so soc components can read from it
 	g.cart = (*cart.Cart)(&dump)
-	g.bus.ConnectCart(&dump)
+	g.soc.Bus.ConnectCart(&dump)
 
 	var cartHeader cart.CartHeader
 	headerErr := binary.Read(bytes.NewReader((*g.cart)[0x0100:0x0150]), binary.LittleEndian, &cartHeader)

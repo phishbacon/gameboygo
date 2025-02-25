@@ -2,56 +2,51 @@ package cpu
 
 import (
 	"fmt"
-	"goboy/bus"
 	"goboy/cpu/registers"
 	"os"
 )
 
 type CPU struct {
-	bus       *bus.Bus
-	registers *registers.Registers
-	curInst   *Instruction
+	Registers *registers.Registers
+	CurInst   *Instruction
 
-	fetched          uint16
-	destAddr         uint16
-	relAddr          int8
-	ticks            uint64
-	intrMasterEnable bool
-	halted           bool
+	Fetched          uint16
+	DestAddr         uint16
+	RelAddr          int8
+	Ticks            uint64
+	Halted           bool
+  Read            func(uint16) uint8
+  Write           func(uint16, uint8)
 }
 
-func NewCPU(bus *bus.Bus) *CPU {
+func NewCPU() *CPU {
 	registers := new(registers.Registers)
 	return &CPU{
-		bus:       bus,
-		registers: registers,
+		Registers: registers,
 	}
 }
 
+func (c *CPU) SetReadWrite(Read func(uint16) uint8, Write func(uint16, uint8)) {
+  c.Read = Read
+  c.Write = Write
+}
+
 func (c *CPU) Init() {
-  c.registers.A = 0x0011
-  c.registers.SetFlag(registers.ZERO_FLAG, true)
-  c.registers.B = 0x0000
-  c.registers.C = 0x0000
-  c.registers.D = 0x00FF
-  c.registers.E = 0x0056
-  c.registers.H = 0x0000
-  c.registers.L = 0x000D
-	c.registers.PC = 0x0100
-  c.registers.SP = 0xFFFE
-}
-
-func (c *CPU) Read(address uint16) uint8 {
-	return c.bus.Read(address)
-}
-
-func (c *CPU) Write(address uint16, value uint8) {
-	c.bus.Write(address, value)
+  c.Registers.A = 0x0011
+  c.Registers.SetFlag(registers.ZERO_FLAG, true)
+  c.Registers.B = 0x0000
+  c.Registers.C = 0x0000
+  c.Registers.D = 0x00FF
+  c.Registers.E = 0x0056
+  c.Registers.H = 0x0000
+  c.Registers.L = 0x000D
+	c.Registers.PC = 0x0100
+  c.Registers.SP = 0xFFFE
 }
 
 func (c *CPU) StackPush(value uint8) {
-	c.registers.SP--
-	c.Write(c.registers.SP, value)
+	c.Registers.SP--
+	c.Write(c.Registers.SP, value)
 }
 
 func (c *CPU) StackPush16(value uint16) {
@@ -62,7 +57,7 @@ func (c *CPU) StackPush16(value uint16) {
 }
 
 func (c *CPU) execute() {
-	pc := c.registers.PC
+	pc := c.Registers.PC
 	opcode := c.Read(pc)
 	c.cpuCycles(1)
 	if opcode >= uint8(len(Instructions)) {
@@ -70,7 +65,7 @@ func (c *CPU) execute() {
 		os.Exit(-1)
 	} else if Instructions[opcode].Operation == nil {
 		fmt.Printf("opcode: %04x not implemented\n", opcode)
-		fmt.Printf("%02x 02%d 02%d\n", opcode, c.Read(c.registers.PC+1), c.Read(c.registers.PC+2))
+		fmt.Printf("%02x 02%d 02%d\n", opcode, c.Read(c.Registers.PC+1), c.Read(c.Registers.PC+2))
 		os.Exit(-1)
 	}
 
@@ -78,27 +73,27 @@ func (c *CPU) execute() {
 }
 
 func (c *CPU) process(opcode uint8) {
-	c.curInst = &Instructions[opcode]
+	c.CurInst = &Instructions[opcode]
 	fmt.Printf("%-10s \t %02x %02x %02x ",
-		c.curInst.Mnemonic,
+		c.CurInst.Mnemonic,
 		opcode,
-		c.Read(c.registers.PC+1),
-		c.Read(c.registers.PC+2))
-	c.registers.PC++
-	c.curInst.AddrMode(c)
-	c.curInst.Operation(c)
+		c.Read(c.Registers.PC+1),
+		c.Read(c.Registers.PC+2))
+	c.Registers.PC++
+	c.CurInst.AddrMode(c)
+	c.CurInst.Operation(c)
 	fmt.Printf("AF: 0b%016b BC: 0x%04x DE: 0x%04x HL: 0x%04x PC: 0x%04x SP: 0x%04x Ticks: %d\n",
-		c.registers.GetAF(),
-		c.registers.GetBC(),
-		c.registers.GetDE(),
-		c.registers.GetHL(),
-		c.registers.PC,
-		c.registers.SP,
-		c.ticks)
+		c.Registers.GetAF(),
+		c.Registers.GetBC(),
+		c.Registers.GetDE(),
+		c.Registers.GetHL(),
+		c.Registers.PC,
+		c.Registers.SP,
+		c.Ticks)
 }
 
 func (c *CPU) Step() bool {
-	if !c.halted {
+	if !c.Halted {
 		c.execute()
 	}
 
@@ -130,7 +125,7 @@ type Instruction struct {
 func (c *CPU) cpuCycles(cycles uint8) {
 	var n int = int(cycles) * 4
 	for i := 0; i < n; i++ {
-		c.ticks++
+		c.Ticks++
 	}
 	return
 }
@@ -143,48 +138,48 @@ func NONE(c *CPU) {
 // 16 bit address
 func R_A16(c *CPU) {
 	// grab low and hi byte from adddress pc and pc +1
-	lo := c.Read(c.registers.PC)
+	lo := c.Read(c.Registers.PC)
 	c.cpuCycles(1)
-	hi := c.Read(c.registers.PC + 1)
+	hi := c.Read(c.Registers.PC + 1)
 	c.cpuCycles(1)
-	c.registers.PC += 2
-	c.fetched = (uint16(hi) << 8) | uint16(lo)
+	c.Registers.PC += 2
+	c.Fetched = (uint16(hi) << 8) | uint16(lo)
 }
 
 func A16_R(c *CPU) {
 	// grab low and hi byte from adddress pc and pc +1
-	lo := c.Read(c.registers.PC)
+	lo := c.Read(c.Registers.PC)
 	c.cpuCycles(1)
-	hi := c.Read(c.registers.PC + 1)
+	hi := c.Read(c.Registers.PC + 1)
 	c.cpuCycles(1)
-	c.registers.PC += 2
-	c.fetched = (uint16(hi) << 8) | uint16(lo)
+	c.Registers.PC += 2
+	c.Fetched = (uint16(hi) << 8) | uint16(lo)
 }
 
 func E8(c *CPU) {
-	c.relAddr = int8(c.Read(c.registers.PC))
+	c.RelAddr = int8(c.Read(c.Registers.PC))
 }
 
 // 8 bit immediate data
 func R_N8(c *CPU) {
-	lo := c.Read(c.registers.PC)
+	lo := c.Read(c.Registers.PC)
 	c.cpuCycles(1)
-	c.registers.PC += 1
-	c.fetched = uint16(lo)
+	c.Registers.PC += 1
+	c.Fetched = uint16(lo)
 }
 
 func A8_R(c *CPU) {
-	lo := uint16(c.Read(c.registers.PC)) + 0xFF00
+	lo := uint16(c.Read(c.Registers.PC)) + 0xFF00
 	c.cpuCycles(1)
-	c.registers.PC += 1
-	c.fetched = lo
+	c.Registers.PC += 1
+	c.Fetched = lo
 }
 
 func R_A8(c *CPU) {
-  lo := uint16(c.Read(c.registers.PC)) + 0xFF00
+  lo := uint16(c.Read(c.Registers.PC)) + 0xFF00
   c.cpuCycles(1)
-  c.registers.PC += 1
-  c.fetched = lo
+  c.Registers.PC += 1
+  c.Fetched = lo
 }
 
 func HalfCarrySub(a uint8, b uint8) bool {
@@ -207,12 +202,12 @@ func HalfCarrySub(a uint8, b uint8) bool {
 }
 
 func (c *CPU) SetDecFlags(registerVal uint8) {
-	c.registers.SetFlag(registers.SUBTRACTION_FLAG, true)
+	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, true)
 	if registerVal-1 == 0 {
-		c.registers.SetFlag(registers.ZERO_FLAG, true)
+		c.Registers.SetFlag(registers.ZERO_FLAG, true)
 	}
 	if HalfCarrySub(registerVal, registerVal-1) {
-		c.registers.SetFlag(registers.HALF_CARRY_FLAG, true)
+		c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
 	}
 }
 
@@ -232,8 +227,8 @@ var Instructions = [0x00FF]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) int {
-			c.SetDecFlags(c.registers.B)
-			c.registers.B--
+			c.SetDecFlags(c.Registers.B)
+			c.Registers.B--
 			return 4
 		},
 	},
@@ -243,7 +238,7 @@ var Instructions = [0x00FF]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) int {
-			c.registers.B = uint8(c.fetched)
+			c.Registers.B = uint8(c.Fetched)
 			return 8
 		},
 	},
@@ -253,7 +248,7 @@ var Instructions = [0x00FF]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) int {
-			c.registers.C = uint8(c.fetched)
+			c.Registers.C = uint8(c.Fetched)
 			return 8
 		},
 	},
@@ -262,7 +257,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     3,
 		AddrMode: R_A16,
 		Operation: func(c *CPU) int {
-			c.registers.SetHL(c.fetched)
+			c.Registers.SetHL(c.Fetched)
 			c.cpuCycles(1)
 			return 12
 		},
@@ -272,9 +267,9 @@ var Instructions = [0x00FF]Instruction{
 		Size:     1,
 		AddrMode: NONE,
 		Operation: func(c *CPU) int {
-			c.Write(c.registers.GetHL(), c.registers.A)
-			prev := c.registers.GetHL()
-			c.registers.SetHL(prev - 1)
+			c.Write(c.Registers.GetHL(), c.Registers.A)
+			prev := c.Registers.GetHL()
+			c.Registers.SetHL(prev - 1)
 			return 8
 		},
 	},
@@ -283,7 +278,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     3,
 		AddrMode: R_A16,
 		Operation: func(c *CPU) int {
-			c.registers.PC = c.fetched
+			c.Registers.PC = c.Fetched
 			c.cpuCycles(1)
 			return 16
 		},
@@ -293,7 +288,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     3,
 		AddrMode: R_A16,
 		Operation: func(c *CPU) int {
-			c.registers.SP = c.fetched
+			c.Registers.SP = c.Fetched
 			return 12
 		},
 	},
@@ -302,8 +297,8 @@ var Instructions = [0x00FF]Instruction{
 		Size:     1,
 		AddrMode: NONE,
 		Operation: func(c *CPU) int {
-			c.registers.A = c.registers.A ^ c.registers.A
-			c.registers.SetFlag(registers.ZERO_FLAG, true)
+			c.Registers.A = c.Registers.A ^ c.Registers.A
+			c.Registers.SetFlag(registers.ZERO_FLAG, true)
 			return 4
 		},
 	},
@@ -312,7 +307,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     1,
 		AddrMode: NONE,
 		Operation: func(c *CPU) int {
-			c.intrMasterEnable = false
+			c.Registers.IME = false
 			return 4
 		},
 	},
@@ -321,9 +316,9 @@ var Instructions = [0x00FF]Instruction{
 		Size:     2,
 		AddrMode: E8,
 		Operation: func(c *CPU) int {
-			if !c.registers.GetFlag(registers.ZERO_FLAG) {
-				var pc uint16 = c.registers.PC + uint16(c.relAddr)
-				c.registers.PC = pc
+			if !c.Registers.GetFlag(registers.ZERO_FLAG) {
+				var pc uint16 = c.Registers.PC + uint16(c.RelAddr)
+				c.Registers.PC = pc
 				return 12
 			}
 			return 8
@@ -335,8 +330,8 @@ var Instructions = [0x00FF]Instruction{
 		Size:     1,
 		AddrMode: NONE,
 		Operation: func(c *CPU) int {
-			c.SetDecFlags(c.registers.C)
-			c.registers.C--
+			c.SetDecFlags(c.Registers.C)
+			c.Registers.C--
 			return 4
 		},
 	},
@@ -345,7 +340,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     1,
 		AddrMode: NONE,
 		Operation: func(c *CPU) int {
-			c.registers.SP = c.registers.GetHL()
+			c.Registers.SP = c.Registers.GetHL()
 			return 8
 		},
 	},
@@ -354,7 +349,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     2,
 		AddrMode: R_N8,
 		Operation: func(c *CPU) int {
-			c.registers.A = uint8(c.fetched)
+			c.Registers.A = uint8(c.Fetched)
 			return 8
 		},
 	},
@@ -363,7 +358,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     3,
 		AddrMode: A16_R,
 		Operation: func(c *CPU) int {
-			c.Write(c.fetched, c.registers.A)
+			c.Write(c.Fetched, c.Registers.A)
 			c.cpuCycles(1)
 			return 16
 		},
@@ -373,7 +368,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     2,
 		AddrMode: A8_R,
 		Operation: func(c *CPU) int {
-			c.Write(c.fetched, c.registers.A)
+			c.Write(c.Fetched, c.Registers.A)
 			c.cpuCycles(1)
 			return 12
 		},
@@ -383,7 +378,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     2,
 		AddrMode: R_A8,
 		Operation: func(c *CPU) int {
-			c.registers.A = c.Read(c.fetched)
+			c.Registers.A = c.Read(c.Fetched)
       c.cpuCycles(1)
 			return 12
 		},
@@ -393,7 +388,7 @@ var Instructions = [0x00FF]Instruction{
 		Size:     3,
 		AddrMode: A16_R,
 		Operation: func(c *CPU) int {
-			c.StackPush16(c.destAddr)
+			c.StackPush16(c.DestAddr)
 			return 24
 		},
 	},
