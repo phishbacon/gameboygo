@@ -26,7 +26,7 @@ func NewGoboy() *goboy {
 }
 
 func (g *goboy) Start() {
-  g.soc.Init()
+	g.soc.Init()
 
 	g.running = true
 	g.paused = false
@@ -36,7 +36,7 @@ func (g *goboy) Start() {
 		if g.paused {
 			continue
 		}
-    g.soc.Step()
+		g.soc.Step()
 		g.ticks++
 	}
 }

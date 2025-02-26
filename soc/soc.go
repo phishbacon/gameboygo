@@ -21,22 +21,22 @@ type SOC struct {
 	CPU   *cpu.CPU
 	PPU   *ppu.PPU
 	Timer *timer.Timer
-  Bus   *bus.Bus
+	Bus   *bus.Bus
 }
 
 func NewSOC() *SOC {
-  apu := apu.NewAPU()
-  cpu := cpu.NewCPU()
-  ppu := ppu.NewPPU()
-  timer := new(timer.Timer)
-  bus := bus.NewBus(cpu, apu, ppu, timer)
-  cpu.SetReadWrite(bus.Read, bus.Write)
+	apu := apu.NewAPU()
+	cpu := cpu.NewCPU()
+	ppu := ppu.NewPPU()
+	timer := new(timer.Timer)
+	bus := bus.NewBus(cpu, apu, ppu, timer)
+	cpu.SetReadWrite(bus.Read, bus.Write)
 	return &SOC{
 		APU:   apu,
 		CPU:   cpu,
 		PPU:   ppu,
-    Timer: timer,
-    Bus: bus,
+		Timer: timer,
+		Bus:   bus,
 	}
 }
 

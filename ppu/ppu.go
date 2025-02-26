@@ -4,6 +4,5 @@ type PPU struct {
 }
 
 func NewPPU() *PPU {
-	return &PPU{
-	}
+	return &PPU{}
 }

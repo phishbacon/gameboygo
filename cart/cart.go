@@ -172,7 +172,7 @@ func (c *Cart) Read(address uint16) uint8 {
 }
 
 func (c *Cart) Write(address uint16, value uint8) {
-  (*c)[address] = value
+	(*c)[address] = value
 }
 
 func (c *Cart) DumpHex() {

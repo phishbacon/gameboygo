@@ -12,8 +12,8 @@ import (
 
 type Bus struct {
 	cpu   *cpu.CPU
-  apu   *apu.APU
-  ppu   *ppu.PPU
+	apu   *apu.APU
+	ppu   *ppu.PPU
 	cart  *cart.Cart
 	ram   *ram.RAM
 	timer *timer.Timer
@@ -21,11 +21,11 @@ type Bus struct {
 
 func NewBus(cpu *cpu.CPU, apu *apu.APU, ppu *ppu.PPU, timer *timer.Timer) *Bus {
 	return &Bus{
-    cpu: cpu,
-    apu: apu,
-    ppu: ppu,
-		ram: ram.NewRam(),
-    timer: timer,
+		cpu:   cpu,
+		apu:   apu,
+		ppu:   ppu,
+		ram:   ram.NewRam(),
+		timer: timer,
 	}
 }
 
@@ -108,8 +108,8 @@ func (b *Bus) Write(address uint16, value uint8) {
 		if address <= 0xFF07 && address >= 0xFF04 {
 			b.timer.Write(address, value)
 		} else {
-      util.NilRegister(address)
-    }
+			util.NilRegister(address)
+		}
 	} else if address < 0xFFFF {
 		// HRAM
 		if b.ram != nil && b.ram.HRAM != nil {
