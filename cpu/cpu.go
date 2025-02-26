@@ -236,7 +236,7 @@ func (c *CPU) SetDecFlags(registerVal uint8) {
 	if registerVal-1 == 0 {
 		c.Registers.SetFlag(registers.ZERO_FLAG, true)
 	}
-	if HalfCarrySub(registerVal, registerVal-1) {
+	if registerVal & 0x000F == 0x0000 {
 		c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
 	}
 }
@@ -246,7 +246,7 @@ func (c *CPU) SetIncFlags(registerVal uint8) {
 	if registerVal+1 == 0 {
 		c.Registers.SetFlag(registers.ZERO_FLAG, true)
 	}
-	if HalfCarryAdd(registerVal, registerVal+1) {
+	if registerVal & 0x000F == 0x000F {
 		c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
 	}
 }
