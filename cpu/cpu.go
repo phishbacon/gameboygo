@@ -169,6 +169,7 @@ func A16_R(c *CPU) {
 
 func E8(c *CPU) {
 	c.RelAddr = int8(c.Read(c.Registers.PC))
+	c.cpuCycles(1)
 }
 
 // 8 bit immediate data
@@ -206,10 +207,19 @@ func HalfCarrySub(a uint8, b uint8) bool {
 	// 11111111 & 00010000 = 00010000 // the 5th bit was flipped
 	// 00010000 == 00010000
 	// so we have a half carry
-	if ((a&0x0f)-(b&0x0f))&0x10 == 0x10 {
-		return true
-	}
-	return false
+	return ((a&0x0f)-(b&0x0f))&0x10 == 0x10
+}
+
+func FullCarrySub(a uint8, b uint8) bool {
+	return a-b > a || a-b > b
+}
+
+func HalfCarrySbc(a uint8, b uint8, c uint8) bool {
+	return ((a&0x0f)-(b&0x0f)-(c&0x0f))&0x10 == 0x10
+}
+
+func FullCarrySbc(a uint8, b uint8, c uint8) bool {
+	return b + c > a
 }
 
 func HalfCarryAdd(a uint8, b uint8) bool {
@@ -225,30 +235,45 @@ func HalfCarryAdd(a uint8, b uint8) bool {
 	// 00010000 & 00010000 = 00010000 // the 5th bit was flipped
 	// 00010000 == 00010000
 	// so we have a half carry
-	if ((a&0x0f)+(b&0x0f))&0x10 == 0x10 {
-		return true
-	}
-	return false
+	return ((a&0x0f)+(b&0x0f))&0x10 == 0x10
 }
 
-func (c *CPU) SetDecFlags(registerVal uint8) {
+func FullCarryAdd(a uint8, b uint8) bool {
+	return a+b < a || a+b < b
+}
+
+func HalfCarryAdc(a uint8, b uint8, c uint8) bool {
+	return ((a&0x0f)+(b&0x0f)+(c&0x0f))&0x10 == 0x10
+}
+
+func FullCarryAdc(a uint8, b uint8, c uint8) bool {
+	return a+b+c < a || a+b+c < b || a+b+c < c
+}
+
+func (c *CPU) SetDecRegFlags(registerRef *uint8) {
 	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, true)
-	if registerVal-1 == 0 {
-		c.Registers.SetFlag(registers.ZERO_FLAG, true)
-	}
-	if registerVal & 0x000F == 0x0000 {
-		c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
-	}
+	c.Registers.SetFlag(registers.ZERO_FLAG, *registerRef-1 == 0)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, *registerRef&0x000F == 0x0000)
+	(*registerRef)--
 }
 
-func (c *CPU) SetIncFlags(registerVal uint8) {
+func (c *CPU) SetIncRegFlags(registerRef *uint8) {
 	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, false)
-	if registerVal+1 == 0 {
-		c.Registers.SetFlag(registers.ZERO_FLAG, true)
-	}
-	if registerVal & 0x000F == 0x000F {
-		c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
-	}
+	c.Registers.SetFlag(registers.ZERO_FLAG, *registerRef+1 == 0)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, *registerRef&0x000F == 0x000F)
+	(*registerRef)++
+}
+
+func (c *CPU) SetDecFlags(value uint8) {
+	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, true)
+	c.Registers.SetFlag(registers.ZERO_FLAG, value-1 == 0)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, value&0x000F == 0x0000)
+}
+
+func (c *CPU) SetIncFlags(value uint8) {
+	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, false)
+	c.Registers.SetFlag(registers.ZERO_FLAG, value+1 == 0)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, value&0x000F == 0x000F)
 }
 
 func (c *CPU) SetRotateFlags(registerVal uint8, leftOrRight string) {
@@ -265,7 +290,7 @@ func (c *CPU) SetRotateFlags(registerVal uint8, leftOrRight string) {
 			c.Registers.SetFlag(registers.CARRY_FLAG, true)
 		}
 	case "R":
-		carryBit := registerVal & 0x1
+		carryBit := registerVal & 0x0001
 		if carryBit == 0 {
 			c.Registers.SetFlag(registers.CARRY_FLAG, false)
 		} else if carryBit == 1 {
@@ -282,31 +307,57 @@ func HalfCarryAdd16(a uint16, b uint16) bool {
 	//            +=0001000000000000
 	// 0001000000000000 & 0x1000 = 0001000000000000
 	// overflow from bit 11
-	if ((a&0x0FFF)+(b&0x0FFF))&0x1000 == 0x1000 {
-		return true
-	} else {
-		return false
-	}
+	return ((a&0x0FFF)+(b&0x0FFF))&0x1000 == 0x1000
 }
 
 func FullCarryAdd16(a uint16, b uint16) bool {
-	if a+b < a || a+b < b {
-		return true
-	} else {
-		return false
+	return a+b < a || a+b < b
+}
+
+func (c *CPU) SetAddFlags(a, b uint8) {
+	c.Registers.SetFlag(registers.ZERO_FLAG, a+b == 0)
+	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, false)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, HalfCarryAdd(a, b))
+	c.Registers.SetFlag(registers.CARRY_FLAG, FullCarryAdd(a, b))
+}
+
+func (c *CPU) SetSubFlags(a, b uint8) {
+	c.Registers.SetFlag(registers.ZERO_FLAG, a-b == 0)
+	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, true)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, HalfCarrySub(a, b))
+	c.Registers.SetFlag(registers.CARRY_FLAG, FullCarrySub(a, b))
+}
+
+func (c *CPU) SetAdcFlags(a, b uint8) uint8 {
+	var carryFlag uint8
+	if c.Registers.GetFlag(registers.CARRY_FLAG) {
+		carryFlag = 1
 	}
+	c.Registers.SetFlag(registers.ZERO_FLAG, a+b+carryFlag == 0)
+	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, false)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, HalfCarryAdc(a, b, carryFlag))
+	c.Registers.SetFlag(registers.CARRY_FLAG, FullCarryAdc(a, b, carryFlag))
+
+	return carryFlag
+}
+
+func (c *CPU) SetSbcFlags(a, b uint8) uint8 {
+	var carryFlag uint8
+	if c.Registers.GetFlag(registers.CARRY_FLAG) {
+		carryFlag = 1
+	}
+	c.Registers.SetFlag(registers.ZERO_FLAG, a-b-carryFlag == 0)
+	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, true)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, HalfCarrySbc(a, b, carryFlag))
+	c.Registers.SetFlag(registers.CARRY_FLAG, FullCarrySbc(a, b, carryFlag))
+
+	return carryFlag
 }
 
 func (c *CPU) SetAddFlags16(a uint16, b uint16) {
 	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, false)
-
-	if HalfCarryAdd16(a, b) {
-		c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
-	}
-
-	if FullCarryAdd16(a, b) {
-		c.Registers.SetFlag(registers.CARRY_FLAG, true)
-	}
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, HalfCarryAdd16(a, b))
+	c.Registers.SetFlag(registers.CARRY_FLAG, FullCarryAdd16(a, b))
 }
 
 var Instructions = [0x0100]Instruction{
@@ -353,8 +404,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) {
-			c.SetIncFlags(c.Registers.B)
-			c.Registers.B++
+			c.SetIncRegFlags(&c.Registers.B)
 		},
 	},
 	0x05: {
@@ -363,8 +413,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) {
-			c.SetDecFlags(c.Registers.B)
-			c.Registers.B--
+			c.SetDecRegFlags(&c.Registers.B)
 		},
 	},
 	0x06: {
@@ -419,9 +468,10 @@ var Instructions = [0x0100]Instruction{
 		Mnemonic: "LD_A_[BC]",
 		Size:     1,
 		Ticks:    []uint8{8},
-		AddrMode: R_A16,
+		AddrMode: NONE,
 		Operation: func(c *CPU) {
-			c.Registers.A = c.Read(c.Fetched)
+			c.Registers.A = c.Read(c.Registers.GetBC())
+			c.cpuCycles(1)
 		},
 	},
 	0x0B: {
@@ -440,8 +490,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) {
-			c.SetIncFlags(c.Registers.C)
-			c.Registers.C++
+			c.SetIncRegFlags(&c.Registers.C)
 		},
 	},
 	0x0D: {
@@ -450,13 +499,13 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: NONE,
 		Ticks:    []uint8{4},
 		Operation: func(c *CPU) {
-			c.SetDecFlags(c.Registers.C)
-			c.Registers.C--
+			c.SetDecRegFlags(&c.Registers.C)
 		},
 	},
 	0x0E: {
 		Mnemonic: "LD_C_N8",
 		Size:     2,
+		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) {
 			c.Registers.C = uint8(c.Fetched)
@@ -477,30 +526,187 @@ var Instructions = [0x0100]Instruction{
 			c.Registers.A = (a >> 1) | (a << 7)
 		},
 	},
-	0x10: {},
-	0x11: {},
-	0x12: {},
-	0x13: {},
-	0x14: {},
-	0x15: {},
-	0x16: {},
-	0x17: {},
-	0x18: {},
-	0x19: {},
-	0x1A: {},
-	0x1B: {},
-	0x1C: {},
-	0x1D: {},
-	0x1E: {},
-	0x1F: {},
+	0x10: {
+		Mnemonic: "STOP_N8",
+		Size:     2,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			fmt.Fprint(os.Stderr, "STOP!\n")
+		},
+	},
+	0x11: {
+		Mnemonic: "LD_DE_N16",
+		Size:     3,
+		Ticks:    []uint8{12},
+		AddrMode: R_A16,
+		Operation: func(c *CPU) {
+			c.Registers.SetDE(c.Fetched)
+		},
+	},
+	0x12: {
+		Mnemonic: "LD_[DE]_A",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetDE(), c.Registers.A)
+			c.cpuCycles(1)
+		},
+	},
+	0x13: {
+		Mnemonic: "INC_DE",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SetDE(c.Registers.GetDE() + 1)
+			c.cpuCycles(1)
+		},
+	},
+	0x14: {
+		Mnemonic: "INC_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetIncRegFlags(&c.Registers.D)
+		},
+	},
+	0x15: {
+		Mnemonic: "DEC_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetDecRegFlags(&c.Registers.D)
+		},
+	},
+	0x16: {
+		Mnemonic: "LD_D_N8",
+		Size:     2,
+		Ticks:    []uint8{8},
+		AddrMode: R_N8,
+		Operation: func(c *CPU) {
+			c.Registers.D = uint8(c.Fetched)
+		},
+	},
+	0x17: {
+		Mnemonic: "RLA",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			a := c.Registers.A
+			var oldCarry uint8
+			if c.Registers.GetFlag(registers.CARRY_FLAG) {
+				oldCarry = 1
+			}
+			c.SetRotateFlags(a, "L")
+			// oldCarry = 1
+			// a = 10010100
+			// a << 1 = 00101000
+			// a | 00000001 = 00101001
+			c.Registers.A = (a << 1) | oldCarry
+		},
+	},
+	0x18: {
+		Mnemonic: "JR_E8",
+		Size:     2,
+		Ticks:    []uint8{12},
+		AddrMode: E8,
+		Operation: func(c *CPU) {
+			c.Registers.PC += uint16(c.RelAddr)
+			c.cpuCycles(1)
+		},
+	},
+	0x19: {
+		Mnemonic: "ADD_HL_DE",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetAddFlags16(c.Registers.GetHL(), c.Registers.GetDE())
+			c.Registers.SetHL(c.Registers.GetHL() + c.Registers.GetDE())
+			c.cpuCycles(1)
+		},
+	},
+	0x1A: {
+		Mnemonic: "LD_A_[DE]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			fetched := c.Read(c.Registers.GetDE())
+			c.cpuCycles(1)
+			c.Registers.A = fetched
+		},
+	},
+	0x1B: {
+		Mnemonic: "DEC_DE",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SetDE(c.Registers.GetDE() - 1)
+			c.cpuCycles(1)
+		},
+	},
+	0x1C: {
+		Mnemonic: "INC_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetIncRegFlags(&c.Registers.E)
+		},
+	},
+	0x1D: {
+		Mnemonic: "DEC_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetDecRegFlags(&c.Registers.E)
+		},
+	},
+	0x1E: {
+		Mnemonic: "LD_E_N8",
+		Size:     2,
+		Ticks:    []uint8{8},
+		AddrMode: R_N8,
+		Operation: func(c *CPU) {
+			c.Registers.E = uint8(c.Fetched)
+		},
+	},
+	0x1F: {
+		Mnemonic: "RRA",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			a := c.Registers.A
+			var oldCarry uint8
+			if c.Registers.GetFlag(registers.CARRY_FLAG) {
+				oldCarry = 1
+			}
+			c.SetRotateFlags(a, "R")
+			// oldCarry = 1
+			// a = 10010100
+			// a >> 1 = 01001010
+			// oldCarry << 7 = 10000000
+			// a | 10000000 = 11001010
+			c.Registers.A = (a >> 1) | (oldCarry << 7)
+		},
+	},
 	0x20: {
 		Mnemonic: "JR_NZ_E8",
 		Size:     2,
+		Ticks:    []uint8{12, 8},
 		AddrMode: E8,
 		Operation: func(c *CPU) {
 			if !c.Registers.GetFlag(registers.ZERO_FLAG) {
-				var pc uint16 = c.Registers.PC + uint16(c.RelAddr)
-				c.Registers.PC = pc
+				c.Registers.PC += uint16(c.RelAddr)
 				c.cpuCycles(1)
 			}
 		},
@@ -508,30 +714,162 @@ var Instructions = [0x0100]Instruction{
 	0x21: {
 		Mnemonic: "LD_HL_N16",
 		Size:     3,
+		Ticks:    []uint8{12},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) {
 			c.Registers.SetHL(c.Fetched)
+		},
+	},
+	0x22: {
+		Mnemonic: "LD_[HLI]_A",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			hl := c.Registers.GetHL()
+			c.Write(hl, c.Registers.A)
+			c.Registers.SetHL(hl + 1)
 			c.cpuCycles(1)
 		},
 	},
-	0x22: {},
-	0x23: {},
-	0x24: {},
-	0x25: {},
-	0x26: {},
+	0x23: {
+		Mnemonic: "INC_HL",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SetHL(c.Registers.GetHL() + 1)
+			c.cpuCycles(1)
+		},
+	},
+	0x24: {
+		Mnemonic: "INC_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetIncRegFlags(&c.Registers.H)
+		},
+	},
+	0x25: {
+		Mnemonic: "DEC_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetDecRegFlags(&c.Registers.H)
+		},
+	},
+	0x26: {
+		Mnemonic: "LD_H_N8",
+		Size:     2,
+		Ticks:    []uint8{8},
+		AddrMode: R_N8,
+		Operation: func(c *CPU) {
+			c.Registers.H = uint8(c.Fetched)
+		},
+	},
 	0x27: {},
-	0x28: {},
-	0x29: {},
-	0x2A: {},
-	0x2B: {},
-	0x2C: {},
-	0x2D: {},
-	0x2E: {},
-	0x2F: {},
-	0x30: {},
+	0x28: {
+		Mnemonic: "JR_Z_E8",
+		Size:     2,
+		Ticks:    []uint8{12, 8},
+		AddrMode: E8,
+		Operation: func(c *CPU) {
+			if c.Registers.GetFlag(registers.ZERO_FLAG) {
+				c.Registers.PC += uint16(c.RelAddr)
+				c.cpuCycles(1)
+			}
+		},
+	},
+	0x29: {
+		Mnemonic: "ADD_HL_HL",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			hl := c.Registers.GetHL()
+			c.SetAddFlags16(hl, hl)
+			c.Registers.SetHL(hl + hl)
+			c.cpuCycles(1)
+		},
+	},
+	0x2A: {
+		Mnemonic: "LD_A_[HLI]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			fetched := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.A = fetched
+			c.Registers.SetHL(c.Registers.GetHL() + 1)
+		},
+	},
+	0x2B: {
+		Mnemonic: "DEC_HL",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SetDE(c.Registers.GetHL() - 1)
+			c.cpuCycles(1)
+		},
+	},
+	0x2C: {
+		Mnemonic: "INC_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetIncRegFlags(&c.Registers.L)
+		},
+	},
+	0x2D: {
+		Mnemonic: "DEC_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetDecRegFlags(&c.Registers.L)
+		},
+	},
+	0x2E: {
+		Mnemonic: "LD_L_N8",
+		Size:     2,
+		Ticks:    []uint8{8},
+		AddrMode: R_N8,
+		Operation: func(c *CPU) {
+			c.Registers.L = uint8(c.Fetched)
+		},
+	},
+	0x2F: {
+		Mnemonic: "CPL",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.A = ^c.Registers.A
+			c.Registers.SetFlag(registers.SUBTRACTION_FLAG, true)
+			c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
+		},
+	},
+	0x30: {
+		Mnemonic: "JR_NC_E8",
+		Size:     2,
+		Ticks:    []uint8{12, 8},
+		AddrMode: E8,
+		Operation: func(c *CPU) {
+			if !c.Registers.GetFlag(registers.CARRY_FLAG) {
+				c.Registers.PC += uint16(c.RelAddr)
+				c.cpuCycles(1)
+			}
+		},
+	},
 	0x31: {
 		Mnemonic: "LD_SP_N16",
 		Size:     3,
+		Ticks:    []uint8{12},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) {
 			c.Registers.SP = c.Fetched
@@ -540,129 +878,1078 @@ var Instructions = [0x0100]Instruction{
 	0x32: {
 		Mnemonic: "LD_[HLD]_A",
 		Size:     1,
+		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) {
-			c.Write(c.Registers.GetHL(), c.Registers.A)
-			prev := c.Registers.GetHL()
-			c.Registers.SetHL(prev - 1)
+			hl := c.Registers.GetHL()
+			c.Write(hl, c.Registers.A)
+			c.Registers.SetHL(hl - 1)
+			c.cpuCycles(1)
 		},
 	},
-	0x33: {},
-	0x34: {},
-	0x35: {},
-	0x36: {},
-	0x37: {},
-	0x38: {},
-	0x39: {},
-	0x3A: {},
-	0x3B: {},
-	0x3C: {},
-	0x3D: {},
+	0x33: {
+		Mnemonic: "INC_SP",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SP++
+			c.cpuCycles(1)
+		},
+	},
+	0x34: {
+		Mnemonic: "INC_[HL]",
+		Size:     1,
+		Ticks:    []uint8{12},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.SetIncFlags(val)
+			c.Write(c.Registers.GetHL(), val+1)
+			c.cpuCycles(1)
+		},
+	},
+	0x35: {
+		Mnemonic: "DEC_[HL]",
+		Size:     1,
+		Ticks:    []uint8{12},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.SetDecFlags(val)
+			c.Write(c.Registers.GetHL(), val-1)
+			c.cpuCycles(1)
+		},
+	},
+	0x36: {
+		Mnemonic: "LD_[HL]_N8",
+		Size:     2,
+		Ticks:    []uint8{12},
+		AddrMode: R_N8,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetHL(), uint8(c.Fetched))
+			c.cpuCycles(1)
+		},
+	},
+	0x37: {
+		Mnemonic: "SCF",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SetFlag(registers.SUBTRACTION_FLAG, false)
+			c.Registers.SetFlag(registers.HALF_CARRY_FLAG, false)
+			c.Registers.SetFlag(registers.CARRY_FLAG, true)
+		},
+	},
+	0x38: {
+		Mnemonic: "JR_C_E8",
+		Size:     2,
+		Ticks:    []uint8{12, 8},
+		AddrMode: E8,
+		Operation: func(c *CPU) {
+			if c.Registers.GetFlag(registers.CARRY_FLAG) {
+				c.Registers.PC += uint16(c.RelAddr)
+				c.cpuCycles(1)
+			}
+		},
+	},
+	0x39: {
+		Mnemonic: "ADD_HL_SP",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			hl := c.Registers.GetHL()
+			c.SetAddFlags16(hl, c.Registers.SP)
+			c.Registers.SetHL(hl + c.Registers.SP)
+			c.cpuCycles(1)
+		},
+	},
+	0x3A: {
+		Mnemonic: "LD_A_[HLD]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			fetched := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.A = fetched
+			c.Registers.SetHL(c.Registers.GetHL() - 1)
+		},
+	},
+	0x3B: {
+		Mnemonic: "DEC_SP",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SP--
+			c.cpuCycles(1)
+		},
+	},
+	0x3C: {
+		Mnemonic: "INC_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetIncRegFlags(&c.Registers.A)
+		},
+	},
+	0x3D: {
+		Mnemonic: "DEC_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetDecRegFlags(&c.Registers.A)
+		},
+	},
 	0x3E: {
 		Mnemonic: "LD_A_N8",
 		Size:     2,
+		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) {
 			c.Registers.A = uint8(c.Fetched)
 		},
 	},
-	0x3F: {},
-	0x40: {},
-	0x41: {},
-	0x42: {},
-	0x43: {},
-	0x44: {},
-	0x45: {},
-	0x46: {},
-	0x47: {},
-	0x48: {},
-	0x49: {},
-	0x4A: {},
-	0x4B: {},
-	0x4C: {},
-	0x4D: {},
-	0x4E: {},
-	0x4F: {},
-	0x50: {},
-	0x51: {},
-	0x52: {},
-	0x53: {},
-	0x54: {},
-	0x55: {},
-	0x56: {},
-	0x57: {},
-	0x58: {},
-	0x59: {},
-	0x5A: {},
-	0x5B: {},
-	0x5C: {},
-	0x5D: {},
-	0x5E: {},
-	0x5F: {},
-	0x60: {},
-	0x61: {},
-	0x62: {},
-	0x63: {},
-	0x64: {},
-	0x65: {},
-	0x66: {},
-	0x67: {},
-	0x68: {},
-	0x69: {},
-	0x6A: {},
-	0x6B: {},
-	0x6C: {},
-	0x6D: {},
-	0x6E: {},
-	0x6F: {},
-	0x70: {},
-	0x71: {},
-	0x72: {},
-	0x73: {},
-	0x74: {},
-	0x75: {},
+	0x3F: {
+		Mnemonic: "CCF",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SetFlag(registers.SUBTRACTION_FLAG, false)
+			c.Registers.SetFlag(registers.HALF_CARRY_FLAG, false)
+			og := c.Registers.GetFlag(registers.CARRY_FLAG)
+			c.Registers.SetFlag(registers.CARRY_FLAG, !og)
+		},
+	},
+	0x40: {
+		Mnemonic: "LD_B_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			return
+		},
+	},
+	0x41: {
+		Mnemonic: "LD_B_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.B = c.Registers.C
+		},
+	},
+	0x42: {
+		Mnemonic: "LD_B_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.B = c.Registers.D
+		},
+	},
+	0x43: {
+		Mnemonic: "LD_B_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.B = c.Registers.E
+		},
+	},
+	0x44: {
+		Mnemonic: "LD_B_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.B = c.Registers.H
+		},
+	},
+	0x45: {
+		Mnemonic: "LD_B_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.B = c.Registers.L
+		},
+	},
+	0x46: {
+		Mnemonic: "LD_B_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.B = val
+		},
+	},
+	0x47: {
+		Mnemonic: "LD_B_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.B = c.Registers.A
+		},
+	},
+	0x48: {
+		Mnemonic: "LD_C_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.C = c.Registers.B
+		},
+	},
+	0x49: {
+		Mnemonic: "LD_C_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			return
+		},
+	},
+	0x4A: {
+		Mnemonic: "LD_C_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.C = c.Registers.D
+		},
+	},
+	0x4B: {
+		Mnemonic: "LD_C_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.C = c.Registers.E
+		},
+	},
+	0x4C: {
+		Mnemonic: "LD_C_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.C = c.Registers.H
+		},
+	},
+	0x4D: {
+		Mnemonic: "LD_C_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.C = c.Registers.L
+		},
+	},
+	0x4E: {
+		Mnemonic: "LD_C_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.C = val
+		},
+	},
+	0x4F: {
+		Mnemonic: "LD_C_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.C = c.Registers.A
+		},
+	},
+	0x50: {
+		Mnemonic: "LD_D_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.D = c.Registers.B
+		},
+	},
+	0x51: {
+		Mnemonic: "LD_D_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.D = c.Registers.C
+		},
+	},
+	0x52: {
+		Mnemonic: "LD_D_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			return
+		},
+	},
+	0x53: {
+		Mnemonic: "LD_D_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.D = c.Registers.E
+		},
+	},
+	0x54: {
+		Mnemonic: "LD_D_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.D = c.Registers.H
+		},
+	},
+	0x55: {
+		Mnemonic: "LD_D_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.D = c.Registers.L
+		},
+	},
+	0x56: {
+		Mnemonic: "LD_D_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.D = val
+		},
+	},
+	0x57: {
+		Mnemonic: "LD_D_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.D = c.Registers.A
+		},
+	},
+	0x58: {
+		Mnemonic: "LD_E_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.E = c.Registers.B
+		},
+	},
+	0x59: {
+		Mnemonic: "LD_E_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.E = c.Registers.C
+		},
+	},
+	0x5A: {
+		Mnemonic: "LD_E_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.E = c.Registers.D
+		},
+	},
+	0x5B: {
+		Mnemonic: "LD_E_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			return
+		},
+	},
+	0x5C: {
+		Mnemonic: "LD_E_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.E = c.Registers.H
+		},
+	},
+	0x5D: {
+		Mnemonic: "LD_E_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.E = c.Registers.L
+		},
+	},
+	0x5E: {
+		Mnemonic: "LD_E_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.E = val
+		},
+	},
+	0x5F: {
+		Mnemonic: "LD_E_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.E = c.Registers.A
+		},
+	},
+	0x60: {
+		Mnemonic: "LD_H_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.H = c.Registers.B
+		},
+	},
+	0x61: {
+		Mnemonic: "LD_H_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.H = c.Registers.C
+		},
+	},
+	0x62: {
+		Mnemonic: "LD_H_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.H = c.Registers.D
+		},
+	},
+	0x63: {
+		Mnemonic: "LD_H_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.H = c.Registers.E
+		},
+	},
+	0x64: {
+		Mnemonic: "LD_H_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			return
+		},
+	},
+	0x65: {
+		Mnemonic: "LD_H_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.H = c.Registers.L
+		},
+	},
+	0x66: {
+		Mnemonic: "LD_H_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.H = val
+		},
+	},
+	0x67: {
+		Mnemonic: "LD_H_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.H = c.Registers.A
+		},
+	},
+	0x68: {
+		Mnemonic: "LD_L_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.L = c.Registers.B
+		},
+	},
+	0x69: {
+		Mnemonic: "LD_L_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.L = c.Registers.C
+		},
+	},
+	0x6A: {
+		Mnemonic: "LD_L_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.L = c.Registers.D
+		},
+	},
+	0x6B: {
+		Mnemonic: "LD_L_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.L = c.Registers.E
+		},
+	},
+	0x6C: {
+		Mnemonic: "LD_L_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.L = c.Registers.H
+		},
+	},
+	0x6D: {
+		Mnemonic: "LD_L_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			return
+		},
+	},
+	0x6E: {
+		Mnemonic: "LD_L_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.L = val
+		},
+	},
+	0x6F: {
+		Mnemonic: "LD_L_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.L = c.Registers.A
+		},
+	},
+	0x70: {
+		Mnemonic: "LD_[HL]_B",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetHL(), c.Registers.B)
+			c.cpuCycles(1)
+		},
+	},
+	0x71: {
+		Mnemonic: "LD_[HL]_C",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetHL(), c.Registers.C)
+			c.cpuCycles(1)
+		},
+	},
+	0x72: {
+		Mnemonic: "LD_[HL]_D",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetHL(), c.Registers.D)
+			c.cpuCycles(1)
+		},
+	},
+	0x73: {
+		Mnemonic: "LD_[HL]_E",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetHL(), c.Registers.E)
+			c.cpuCycles(1)
+		},
+	},
+	0x74: {
+		Mnemonic: "LD_[HL]_H",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetHL(), c.Registers.H)
+			c.cpuCycles(1)
+		},
+	},
+	0x75: {
+		Mnemonic: "LD_[HL]_L",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetHL(), c.Registers.L)
+			c.cpuCycles(1)
+		},
+	},
 	0x76: {},
-	0x77: {},
-	0x78: {},
-	0x79: {},
-	0x7A: {},
-	0x7B: {},
-	0x7C: {},
-	0x7D: {},
-	0x7E: {},
-	0x7F: {},
-	0x80: {},
-	0x81: {},
-	0x82: {},
-	0x83: {},
-	0x84: {},
-	0x85: {},
-	0x86: {},
-	0x87: {},
-	0x88: {},
-	0x89: {},
-	0x8A: {},
-	0x8B: {},
-	0x8C: {},
-	0x8D: {},
-	0x8E: {},
-	0x8F: {},
-	0x90: {},
-	0x91: {},
-	0x92: {},
-	0x93: {},
-	0x94: {},
-	0x95: {},
-	0x96: {},
-	0x97: {},
-	0x98: {},
-	0x99: {},
-	0x9A: {},
-	0x9B: {},
-	0x9C: {},
-	0x9D: {},
-	0x9E: {},
-	0x9F: {},
+	0x77: {
+		Mnemonic: "LD_[HL]_A",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Write(c.Registers.GetHL(), c.Registers.A)
+			c.cpuCycles(1)
+		},
+	},
+	0x78: {
+		Mnemonic: "LD_A_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.A = c.Registers.B
+		},
+	},
+	0x79: {
+		Mnemonic: "LD_A_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.A = c.Registers.C
+		},
+	},
+	0x7A: {
+		Mnemonic: "LD_A_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.A = c.Registers.D
+		},
+	},
+	0x7B: {
+		Mnemonic: "LD_A_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.A = c.Registers.E
+		},
+	},
+	0x7C: {
+		Mnemonic: "LD_A_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.A = c.Registers.H
+		},
+	},
+	0x7D: {
+		Mnemonic: "LD_A_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.A = c.Registers.L
+		},
+	},
+	0x7E: {
+		Mnemonic: "LD_A_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.Registers.A = val
+		},
+	},
+	0x7F: {
+		Mnemonic: "LD_A_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			return
+		},
+	},
+	0x80: {
+		Mnemonic: "ADD_A_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetAddFlags(c.Registers.A, c.Registers.B)
+			c.Registers.A += c.Registers.B
+		},
+	},
+	0x81: {
+		Mnemonic: "ADD_A_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetAddFlags(c.Registers.A, c.Registers.C)
+			c.Registers.A += c.Registers.C
+		},
+	},
+	0x82: {
+		Mnemonic: "ADD_A_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetAddFlags(c.Registers.A, c.Registers.D)
+			c.Registers.A += c.Registers.D
+		},
+	},
+	0x83: {
+		Mnemonic: "ADD_A_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetAddFlags(c.Registers.A, c.Registers.E)
+			c.Registers.A += c.Registers.E
+		},
+	},
+	0x84: {
+		Mnemonic: "ADD_A_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetAddFlags(c.Registers.A, c.Registers.H)
+			c.Registers.A += c.Registers.H
+		},
+	},
+	0x85: {
+		Mnemonic: "ADD_A_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetAddFlags(c.Registers.A, c.Registers.L)
+			c.Registers.A += c.Registers.L
+		},
+	},
+	0x86: {
+		Mnemonic: "ADD_A_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.SetAddFlags(c.Registers.A, val)
+			c.Registers.A += val
+		},
+	},
+	0x87: {
+		Mnemonic: "ADD_A_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetAddFlags(c.Registers.A, c.Registers.A)
+			c.Registers.A += c.Registers.A
+		},
+	},
+	0x88: {
+		Mnemonic: "ADC_A_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetAdcFlags(c.Registers.A, c.Registers.B)
+			c.Registers.A += (c.Registers.B + carryFlag)
+		},
+	},
+	0x89: {
+		Mnemonic: "ADC_A_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetAdcFlags(c.Registers.A, c.Registers.C)
+			c.Registers.A += (c.Registers.C + carryFlag)
+		},
+	},
+	0x8A: {
+		Mnemonic: "ADC_A_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetAdcFlags(c.Registers.A, c.Registers.D)
+			c.Registers.A += (c.Registers.D + carryFlag)
+		},
+	},
+	0x8B: {
+		Mnemonic: "ADC_A_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetAdcFlags(c.Registers.A, c.Registers.E)
+			c.Registers.A += (c.Registers.E + carryFlag)
+		},
+	},
+	0x8C: {
+		Mnemonic: "ADC_A_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetAdcFlags(c.Registers.A, c.Registers.H)
+			c.Registers.A += (c.Registers.H + carryFlag)
+		},
+	},
+	0x8D: {
+		Mnemonic: "ADC_A_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetAdcFlags(c.Registers.A, c.Registers.L)
+			c.Registers.A += (c.Registers.L + carryFlag)
+		},
+	},
+	0x8E: {
+		Mnemonic: "ADC_A_[HL]",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			carryFlag := c.SetAdcFlags(c.Registers.A, val)
+			c.Registers.A += (val + carryFlag)
+		},
+	},
+	0x8F: {
+		Mnemonic: "ADC_A_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetAdcFlags(c.Registers.A, c.Registers.A)
+			c.Registers.A += (c.Registers.A + carryFlag)
+		},
+	},
+	0x90: {
+		Mnemonic: "SUB_A_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetSubFlags(c.Registers.A, c.Registers.B)
+			c.Registers.A -= c.Registers.B
+		},
+	},
+	0x91: {
+		Mnemonic: "SUB_A_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetSubFlags(c.Registers.A, c.Registers.C)
+			c.Registers.A -= c.Registers.C
+		},
+	},
+	0x92: {
+		Mnemonic: "SUB_A_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetSubFlags(c.Registers.A, c.Registers.D)
+			c.Registers.A -= c.Registers.D
+		},
+	},
+	0x93: {
+		Mnemonic: "SUB_A_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetSubFlags(c.Registers.A, c.Registers.E)
+			c.Registers.A -= c.Registers.E
+		},
+	},
+	0x94: {
+		Mnemonic: "SUB_A_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetSubFlags(c.Registers.A, c.Registers.H)
+			c.Registers.A -= c.Registers.H
+		},
+	},
+	0x95: {
+		Mnemonic: "SUB_A_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.SetSubFlags(c.Registers.A, c.Registers.L)
+			c.Registers.A -= c.Registers.L
+		},
+	},
+	0x96: {
+		Mnemonic: "SUB_A_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			c.cpuCycles(1)
+			c.SetSubFlags(c.Registers.A, val)
+			c.Registers.A -= val
+		},
+	},
+	0x97: {
+		Mnemonic: "SUB_A_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			c.Registers.SetFlag(registers.ZERO_FLAG, true)
+			c.Registers.SetFlag(registers.SUBTRACTION_FLAG, true)
+			c.Registers.SetFlag(registers.HALF_CARRY_FLAG, false)
+			c.Registers.SetFlag(registers.CARRY_FLAG, false)
+			c.Registers.A = 0
+		},
+	},
+	0x98: {
+		Mnemonic: "SBC_A_B",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetSbcFlags(c.Registers.A, c.Registers.B)
+			c.Registers.A -= (c.Registers.B - carryFlag)
+		},
+	},
+	0x99: {
+		Mnemonic: "SBC_A_C",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetSbcFlags(c.Registers.A, c.Registers.C)
+			c.Registers.A -= (c.Registers.C - carryFlag)
+		},
+	},
+	0x9A: {
+		Mnemonic: "SBC_A_D",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetSbcFlags(c.Registers.A, c.Registers.D)
+			c.Registers.A -= (c.Registers.D - carryFlag)
+		},
+	},
+	0x9B: {
+		Mnemonic: "SBC_A_E",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetSbcFlags(c.Registers.A, c.Registers.E)
+			c.Registers.A -= (c.Registers.E - carryFlag)
+		},
+	},
+	0x9C: {
+		Mnemonic: "SBC_A_H",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetSbcFlags(c.Registers.A, c.Registers.H)
+			c.Registers.A -= (c.Registers.H - carryFlag)
+		},
+	},
+	0x9D: {
+		Mnemonic: "SBC_A_L",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			carryFlag := c.SetSbcFlags(c.Registers.A, c.Registers.L)
+			c.Registers.A -= (c.Registers.L - carryFlag)
+		},
+	},
+	0x9E: {
+		Mnemonic: "SBC_A_[HL]",
+		Size:     1,
+		Ticks:    []uint8{8},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			val := c.Read(c.Registers.GetHL())
+			carryFlag := c.SetSbcFlags(c.Registers.A, val)
+			c.Registers.A -= (val - carryFlag)
+		},
+	},
+	0x9F: {
+		Mnemonic: "SBC_A_A",
+		Size:     1,
+		Ticks:    []uint8{4},
+		AddrMode: NONE,
+		Operation: func(c *CPU) {
+			oldCarryFlag := c.Registers.GetFlag(registers.CARRY_FLAG)
+			carryFlag := c.SetSbcFlags(c.Registers.A, c.Registers.A)
+			c.Registers.A -= (c.Registers.A - carryFlag)
+			// set carryFlag back to original value as it should not be affected by this opcode
+			c.Registers.SetFlag(registers.SUBTRACTION_FLAG, oldCarryFlag)
+		},
+	},
 	0xA0: {},
 	0xA1: {},
 	0xA2: {},
