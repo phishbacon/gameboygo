@@ -74,7 +74,7 @@ func (b *Bus) Read(address uint16) uint8 {
 		return 1
 	}
 
-	return util.NotImplemented()
+	return util.NilRegister(address)
 }
 
 func (b *Bus) Write(address uint16, value uint8) {
