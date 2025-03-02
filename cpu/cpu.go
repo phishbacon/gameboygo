@@ -3,8 +3,13 @@ package cpu
 import (
 	"fmt"
 	"goboy/cpu/registers"
+	"goboy/io"
+	"log"
 	"os"
 )
+
+const IF uint16 = 0xFF0F
+const IE uint16 = 0xFFFF
 
 type CPU struct {
 	Registers *registers.Registers
@@ -94,9 +99,7 @@ func (c *CPU) process(opcode uint8) {
 		c.Read(c.Registers.PC+1),
 		c.Read(c.Registers.PC+2))
 	c.Registers.PC++
-	c.CurInst.AddrMode(c)
-	c.CurInst.Operation(c)
-	fmt.Printf("AF: 0b%016b BC: 0x%04x DE: 0x%04x HL: 0x%04x PC: 0x%04x SP: 0x%04x Ticks: %d\n",
+	log.Printf("AF: 0b%016b BC: 0x%04x DE: 0x%04x HL: 0x%04x PC: 0x%04x SP: 0x%04x Ticks: %d\n",
 		c.Registers.GetAF(),
 		c.Registers.GetBC(),
 		c.Registers.GetDE(),
@@ -104,29 +107,66 @@ func (c *CPU) process(opcode uint8) {
 		c.Registers.PC,
 		c.Registers.SP,
 		c.Ticks)
+	c.CurInst.AddrMode(c)
+	c.CurInst.Operation(c)
 }
 
 func (c *CPU) Step() bool {
 	if !c.Halted {
 		c.execute()
+	} else {
+		c.cpuCycles(1)
+		if c.Read(IF)&c.Read(IE) > 0 {
+			c.Halted = false
+		}
 	}
 
+	if c.Registers.IME {
+		c.HandleInterupts()
+		c.EnablingIME = false
+	}
+
+	if c.EnablingIME {
+		c.Registers.IME = true
+	}
 	return true
+}
+
+func (c *CPU) HandleInterupts() {
+	interuptsFlag := c.Read(IF)
+	interuptsEnabled := c.Read(IE)
+	if (c.CheckInterupt(0x40, interuptsFlag, interuptsEnabled, io.VBLANK)) {
+
+	} else if (c.CheckInterupt(0x48, interuptsFlag, interuptsEnabled, io.LCD)) {
+
+	} else if (c.CheckInterupt(0x50, interuptsFlag, interuptsEnabled, io.TIMER)) {
+
+	} else if (c.CheckInterupt(0x58, interuptsFlag, interuptsEnabled, io.SERIAL)) {
+
+	} else if (c.CheckInterupt(0x60, interuptsFlag, interuptsEnabled, io.JOYPAD)) {
+
+	} 
+}
+
+func (c *CPU) CheckInterupt(address uint16, inf uint8, ie uint8, interupt uint8) bool {
+	if inf&interupt > 0 && ie&interupt > 0 {
+		c.CallInterupt(address, interupt)
+		c.Write(IF, inf & ^interupt)
+		c.Halted = false
+		c.Registers.IME = false
+		return true
+	}
+
+	 return false
+}
+
+func (c *CPU) CallInterupt(address uint16, interupt uint8) {
+	c.StackPush16(c.Registers.PC)
+	c.Registers.PC = address
 }
 
 type Operation func(c *CPU)
 type AddrMode func(c *CPU)
-
-type Condition uint8
-
-const (
-	C_Z Condition = iota
-	C_NZ
-	C_H
-	C_C
-	C_NC
-	C_NONE
-)
 
 type Instruction struct {
 	Mnemonic  string
@@ -382,6 +422,45 @@ func (c *CPU) SetSwapFlags(registerVal uint8) uint8 {
 	lowNibble := registerVal & 0x000F
 
 	return (lowNibble << 4) | highNibble
+}
+
+func (c *CPU) SetBitFlags(registerVal uint8, bit uint8) {
+	c.Registers.SetFlag(registers.SUBTRACTION_FLAG, false)
+	c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
+	var i uint8
+	var bitValue uint8 = 1
+	for i = 0; i < bit; i++ {
+		bitValue *= 2
+	}
+	// 00101110
+	//&00010000
+	// 00000000
+	c.Registers.SetFlag(registers.ZERO_FLAG, registerVal&bitValue == 0)
+}
+
+func (c *CPU) SetBit(registerVal uint8, bit uint8, set bool) uint8 {
+	var i uint8
+	var bitValue uint8 = 1
+	for i = 0; i < bit; i++ {
+		bitValue *= 2
+	}
+	if set {
+		if registerVal&bitValue == 0 {
+			registerVal &= bitValue
+		}
+	} else {
+		//
+		// 11000100
+		//&01000000
+		//=01000000 != 0 so
+		// 11000100
+		//^01000000
+		//=10000100
+		if registerVal&bitValue != 0 {
+			registerVal ^= bitValue
+		}
+	}
+	return registerVal
 }
 
 func HalfCarryAdd16(a uint16, b uint16) bool {
@@ -2545,12 +2624,13 @@ var Instructions = [0x0100]Instruction{
 	0xCB: {
 		Mnemonic: "CB",
 		Size:     3,
-		Ticks:    []uint8{12, 16, 20},
+		Ticks:    []uint8{8, 16},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) {
 			// 0000000010001101
 			firstNibble := (c.Fetched >> 4) & 0x000F
 			secondNibble := c.Fetched & 0x000F
+			c.cpuCycles(1)
 			switch firstNibble {
 			// rlc rrc
 			case 0x0:
@@ -2559,7 +2639,6 @@ var Instructions = [0x0100]Instruction{
 					if secondNibble != 0x6 {
 						reg := c.CBLookUp(uint8(secondNibble))
 						*reg = c.SetCBRotateFlags(*reg, "L", false)
-						c.cpuCycles(1)
 					} else {
 						val := c.Read(c.Registers.GetHL())
 						c.cpuCycles(1)
@@ -2585,7 +2664,6 @@ var Instructions = [0x0100]Instruction{
 					if secondNibble != 0x6 {
 						reg := c.CBLookUp(uint8(secondNibble))
 						*reg = c.SetCBRotateFlags(*reg, "L", true)
-						c.cpuCycles(1)
 					} else {
 						val := c.Read(c.Registers.GetHL())
 						c.cpuCycles(1)
@@ -2611,7 +2689,6 @@ var Instructions = [0x0100]Instruction{
 					if secondNibble != 0x6 {
 						reg := c.CBLookUp(uint8(secondNibble))
 						*reg = c.SetShiftFlags(*reg, "L", false)
-						c.cpuCycles(1)
 					} else {
 						val := c.Read(c.Registers.GetHL())
 						c.cpuCycles(1)
@@ -2637,7 +2714,6 @@ var Instructions = [0x0100]Instruction{
 					if secondNibble != 0x6 {
 						reg := c.CBLookUp(uint8(secondNibble))
 						*reg = c.SetSwapFlags(*reg)
-						c.cpuCycles(1)
 					} else {
 						val := c.Read(c.Registers.GetHL())
 						c.cpuCycles(1)
@@ -2656,8 +2732,315 @@ var Instructions = [0x0100]Instruction{
 						c.cpuCycles(1)
 					}
 				}
+			// BIT 0 BIT 1
+			case 0x4:
+				if secondNibble < 0x8 {
+					// bit 0
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						c.SetBitFlags(*reg, 0)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						c.SetBitFlags(val, 0)
+					}
+				} else {
+					// bit 1
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						c.SetBitFlags(*reg, 1)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						c.SetBitFlags(val, 1)
+					}
+				}
+			// BIT 2 BIT 3
+			case 0x5:
+				if secondNibble < 0x8 {
+					// bit 2
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						c.SetBitFlags(*reg, 2)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						c.SetBitFlags(val, 2)
+					}
+				} else {
+					// bit 3
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						c.SetBitFlags(*reg, 3)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						c.SetBitFlags(val, 3)
+					}
+				}
+			// BIT 4 BIT 5
+			case 0x6:
+				if secondNibble < 0x8 {
+					// bit 4
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						c.SetBitFlags(*reg, 4)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						c.SetBitFlags(val, 4)
+					}
+				} else {
+					// bit 5
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						c.SetBitFlags(*reg, 5)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						c.SetBitFlags(val, 5)
+					}
+				}
+			// BIT 6 BIT 7
+			case 0x7:
+				if secondNibble < 0x8 {
+					// bit 6
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						c.SetBitFlags(*reg, 6)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						c.SetBitFlags(val, 6)
+					}
+				} else {
+					// bit 7
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						c.SetBitFlags(*reg, 7)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						c.SetBitFlags(val, 7)
+					}
+				}
+			// RES 0 RES 1
+			case 0x8:
+				if secondNibble < 0x8 {
+					// RES 0
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 0, false)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 0, false)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				} else {
+					// RES 1
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 1, false)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 1, false)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				}
+			// RES 2 RES 3
+			case 0x9:
+				if secondNibble < 0x8 {
+					// RES 2
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 2, false)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 2, false)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				} else {
+					// RES 3
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 3, false)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 3, false)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				}
+			// RES 4 RES 5
+			case 0xA:
+				if secondNibble < 0x8 {
+					// RES 4
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 4, false)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 4, false)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				} else {
+					// RES 5
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 5, false)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 5, false)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				}
+			// RES 6 RES 7
+			case 0xB:
+				if secondNibble < 0x8 {
+					// RES 6
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 6, false)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 6, false)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				} else {
+					// RES 7
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 7, false)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 7, false)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				}
+			// SET 0 SET 1
+			case 0xC:
+				if secondNibble < 0x8 {
+					// SET 0
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 0, true)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 0, true)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				} else {
+					// SET 1
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 1, true)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 1, true)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				}
+			// SET 2 SET 3
+			case 0xD:
+				if secondNibble < 0x8 {
+					// SET 2
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 2, true)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 2, true)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				} else {
+					// SET 3
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 3, true)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 3, true)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				}
+			// SET 4 SET 5
+			case 0xE:
+				if secondNibble < 0x8 {
+					// SET 4
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 4, true)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 4, true)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				} else {
+					// SET 5
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 5, true)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 5, true)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				}
+			// SET 6 SET 7
+			case 0xF:
+				if secondNibble < 0x8 {
+					// SET 6
+					if secondNibble != 0x6 {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 6, true)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 6, true)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				} else {
+					// SET 7
+					if secondNibble != 0xE {
+						reg := c.CBLookUp(uint8(secondNibble))
+						*reg = c.SetBit(*reg, 7, true)
+					} else {
+						val := c.Read(c.Registers.GetHL())
+						c.cpuCycles(1)
+						val = c.SetBit(val, 7, true)
+						c.Write(c.Registers.GetHL(), val)
+						c.cpuCycles(1)
+					}
+				}
 			}
-			c.cpuCycles(1)
 		},
 	},
 	0xCC: {

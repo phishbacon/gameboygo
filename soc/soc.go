@@ -17,26 +17,27 @@ const (
 )
 
 type SOC struct {
-	APU   *apu.APU
-	CPU   *cpu.CPU
-	PPU   *ppu.PPU
-	Timer *timer.Timer
-	Bus   *bus.Bus
+	APU     *apu.APU
+	CPU     *cpu.CPU
+	PPU     *ppu.PPU
+	Timer   *timer.Timer
+	Bus     *bus.Bus
+	running bool
+	paused  bool
+	ticks   uint64
 }
 
 func NewSOC() *SOC {
 	apu := apu.NewAPU()
 	cpu := cpu.NewCPU()
 	ppu := ppu.NewPPU()
-	timer := new(timer.Timer)
-	bus := bus.NewBus(cpu, apu, ppu, timer)
+	bus := bus.NewBus(cpu, apu, ppu)
 	cpu.SetReadWrite(bus.Read, bus.Write)
 	return &SOC{
-		APU:   apu,
-		CPU:   cpu,
-		PPU:   ppu,
-		Timer: timer,
-		Bus:   bus,
+		APU: apu,
+		CPU: cpu,
+		PPU: ppu,
+		Bus: bus,
 	}
 }
 
@@ -44,6 +45,17 @@ func (s *SOC) Init() {
 	s.CPU.Init()
 	// s.APU.Init()
 	// s.PPU.Init()
+	s.running = true
+	s.paused = false
+	s.ticks = 0
+
+	for s.running {
+		if s.paused {
+			continue
+		}
+		s.Step()
+		s.ticks++
+	}
 }
 
 func (s *SOC) Step() {

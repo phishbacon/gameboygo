@@ -8,37 +8,30 @@ import (
 	"goboy/soc"
 	"goboy/util"
 	"os"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 )
 
 type goboy struct {
-	soc     *soc.SOC
-	paused  bool
-	running bool
-	ticks   uint64
-	cart    *cart.Cart
+	soc    *soc.SOC
+	cart   *cart.Cart
+	on     bool
+	screen fyne.Window
 }
 
 func NewGoboy() *goboy {
-
 	return &goboy{
 		soc: soc.NewSOC(),
+		on:  false,
 	}
 }
 
 func (g *goboy) Start() {
-	g.soc.Init()
-
-	g.running = true
-	g.paused = false
-	g.ticks = 0
-
-	for g.running {
-		if g.paused {
-			continue
-		}
-		g.soc.Step()
-		g.ticks++
-	}
+	g.on = true
+	go g.soc.Init()
 }
 
 func (g *goboy) LoadCart(fileName string) {
@@ -84,6 +77,11 @@ func main() {
 		os.Exit(-1)
 	}
 
+	a := app.New()
+	w := a.NewWindow("goboy")
+	hello := widget.NewLabel("Hello World")
+	w.SetContent(hello)
+	w.ShowAndRun()
 	goboy := NewGoboy()
 	goboy.LoadCart(args[1])
 
@@ -96,5 +94,4 @@ func main() {
 	}
 
 	goboy.Start()
-
 }

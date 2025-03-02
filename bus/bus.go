@@ -4,28 +4,29 @@ import (
 	"goboy/apu"
 	"goboy/cart"
 	"goboy/cpu"
+	"goboy/io"
 	"goboy/ppu"
 	"goboy/ram"
-	"goboy/timer"
 	"goboy/util"
 )
 
 type Bus struct {
-	cpu   *cpu.CPU
-	apu   *apu.APU
-	ppu   *ppu.PPU
-	cart  *cart.Cart
-	ram   *ram.RAM
-	timer *timer.Timer
+	cpu  *cpu.CPU
+	apu  *apu.APU
+	ppu  *ppu.PPU
+	cart *cart.Cart
+	ram  *ram.RAM
+	io   *io.IO
+	IE   uint8
 }
 
-func NewBus(cpu *cpu.CPU, apu *apu.APU, ppu *ppu.PPU, timer *timer.Timer) *Bus {
+func NewBus(cpu *cpu.CPU, apu *apu.APU, ppu *ppu.PPU) *Bus {
 	return &Bus{
-		cpu:   cpu,
-		apu:   apu,
-		ppu:   ppu,
-		ram:   ram.NewRam(),
-		timer: timer,
+		cpu: cpu,
+		apu: apu,
+		ppu: ppu,
+		ram: ram.NewRam(),
+		io:  new(io.IO),
 	}
 }
 
@@ -39,42 +40,43 @@ func (b *Bus) Read(address uint16) uint8 {
 		if b.cart != nil {
 			return b.cart.Read(address)
 		} else {
-			return util.NilRegister(address)
+			util.ReadNilRegister(address)
+			return util.Exit()
 		}
 	} else if address < 0xA000 {
 		// 8 KiB VRAM
-		return util.NilRegister(address)
+		util.ReadNilRegister(address)
+		return util.Exit()
 	} else if address < 0xE000 {
 		// 8 KiB WRAM
-		if b.ram != nil && b.ram.WRAM != nil {
-			return b.ram.WRAM.Read(address)
-		} else {
-			return util.NilRegister(address)
-		}
+		return b.ram.Read(address)
 	} else if address < 0xFE00 {
 		// Unused Echo RAM
-		return util.NilRegister(address)
+		util.ReadNilRegister(address)
+		return util.Exit()
 	} else if address < 0xFEA0 {
 		// Object attribute memory
-		return util.NilRegister(address)
+		util.ReadNilRegister(address)
+		return util.Exit()
 	} else if address < 0xFF00 {
 		// Not usable
-		return util.NilRegister(address)
+		util.ReadNilRegister(address)
+		return util.Exit()
 	} else if address < 0xFF80 {
 		// I/O Registers
-		if address <= 0xFF07 && address >= 0xFF04 {
-			return b.timer.Read(address)
+		if address >= 0xFF00 && address <= 0xFF7F {
+			return b.io.Read(address)
 		}
+		util.ReadNilRegister(address)
 	} else if address < 0xFFFF {
 		// HRAM
-		if b.ram != nil && b.ram.HRAM != nil {
-			return b.ram.HRAM.Read(address)
-		}
+		return b.ram.Read(address)
 	} else if address == 0xFFFF {
-		return 1
+		return b.IE
 	}
 
-	return util.NilRegister(address)
+	util.ReadNilRegister(address)
+	return util.Exit()
 }
 
 func (b *Bus) Write(address uint16, value uint8) {
@@ -82,40 +84,34 @@ func (b *Bus) Write(address uint16, value uint8) {
 		if b.cart != nil {
 			b.cart.Write(address, value)
 		} else {
-			util.NilRegister(address)
+			util.WriteNilRegister(address)
 		}
 	} else if address < 0xA000 {
 		// 8 KiB VRAM
-		util.NilRegister(address)
+		util.WriteNilRegister(address)
 	} else if address < 0xE000 {
 		// 8 KiB WRAM
-		if b.ram != nil && b.ram.WRAM != nil {
-			b.ram.WRAM.Write(address, value)
-		} else {
-			util.NilRegister(address)
-		}
+		b.ram.Write(address, value)
 	} else if address < 0xFE00 {
 		// Unused Echo RAM
-		util.NilRegister(address)
+		util.WriteNilRegister(address)
 	} else if address < 0xFEA0 {
 		// Object attribute memory
-		util.NilRegister(address)
+		util.WriteNilRegister(address)
 	} else if address < 0xFF00 {
 		// Not usable
-		util.NilRegister(address)
+		util.WriteNilRegister(address)
 	} else if address < 0xFF80 {
 		// I/O Registers
-		if address <= 0xFF07 && address >= 0xFF04 {
-			b.timer.Write(address, value)
+		if address >= 0xFF07 && address <= 0xFF04 {
+			b.io.Write(address, value)
 		} else {
-			util.NilRegister(address)
+			util.WriteNilRegister(address)
 		}
 	} else if address < 0xFFFF {
 		// HRAM
-		if b.ram != nil && b.ram.HRAM != nil {
-			b.ram.HRAM.Write(address, value)
-		}
+		b.ram.Write(address, value)
 	} else if address == 0xFFFF {
-		return
+		b.IE = value
 	}
 }

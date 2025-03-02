@@ -11,8 +11,15 @@ func NotImplemented() uint8 {
 	return 1
 }
 
-func NilRegister(address uint16) uint8 {
-	fmt.Printf("Can't read/write to %04x\n", address)
+func WriteNilRegister(address uint16) {
+	fmt.Printf("Can't write to %04x\n", address)
+}
+
+func ReadNilRegister(address uint16) {
+	fmt.Printf("Can't read from %04x\n", address)
+}
+
+func Exit() uint8 {
 	os.Exit(-1)
 	return 1
 }
