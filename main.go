@@ -9,8 +9,7 @@ import (
 	"goboy/util"
 	"os"
 	"runtime"
-
-	"github.com/go-gl/glfw/v3.3/glfw"
+	qt "github.com/mappu/miqt/qt6"
 )
 
 func init() {
@@ -74,6 +73,7 @@ func (g *Goboy) LoadCart(fileName string) {
 }
 
 func main() {
+	qt.NewQApplication(os.Args)
 	args := os.Args
 	if len(args) < 2 {
 		fmt.Println("Rom required")
@@ -90,33 +90,9 @@ func main() {
 		os.Exit(-1)
 	}
 
-	err := glfw.Init()
-	if err != nil {
-		panic(err)
-	}
-	defer glfw.Terminate()
-
-	window, err := glfw.CreateWindow(640, 480, "Testing", nil, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	window.MakeContextCurrent()
-	window.SetKeyCallback(spacePressed)
-	
 	goboy.Start()
 
 	for goboy.on {
-		if window.ShouldClose() {
-			goboy.on = false
-		}
-		window.SwapBuffers()
-		glfw.PollEvents()
 	}
 }
 
-var spacePressed glfw.KeyCallback = func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	if (key == glfw.KeySpace && action == glfw.Press) {
-		goboy.soc.Step()
-	}
-}
