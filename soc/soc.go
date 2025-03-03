@@ -54,6 +54,7 @@ func (s *SOC) Init() {
 			continue
 		}
 		s.Step()
+		s.paused = true
 		s.ticks++
 	}
 }

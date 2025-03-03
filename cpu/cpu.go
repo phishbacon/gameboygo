@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"goboy/cpu/registers"
 	"goboy/io"
-	"log"
 	"os"
+	"goboy/dbg"
 )
 
 const IF uint16 = 0xFF0F
@@ -93,13 +93,13 @@ func (c *CPU) execute() {
 
 func (c *CPU) process(opcode uint8) {
 	c.CurInst = &Instructions[opcode]
-	fmt.Printf("%-10s \t %02x %02x %02x ",
+	fmt.Printf("%-10s %02x %02x %02x ",
 		c.CurInst.Mnemonic,
 		opcode,
 		c.Read(c.Registers.PC+1),
 		c.Read(c.Registers.PC+2))
 	c.Registers.PC++
-	log.Printf("AF: 0b%016b BC: 0x%04x DE: 0x%04x HL: 0x%04x PC: 0x%04x SP: 0x%04x Ticks: %d\n",
+	fmt.Printf("AF: 0b%04x BC: 0x%04x DE: 0x%04x HL: 0x%04x PC: 0x%04x SP: 0x%04x Ticks: %d\n",
 		c.Registers.GetAF(),
 		c.Registers.GetBC(),
 		c.Registers.GetDE(),
@@ -109,6 +109,8 @@ func (c *CPU) process(opcode uint8) {
 		c.Ticks)
 	c.CurInst.AddrMode(c)
 	c.CurInst.Operation(c)
+	dbg.Update(c.Read, c.Write)
+	dbg.Print()
 }
 
 func (c *CPU) Step() bool {

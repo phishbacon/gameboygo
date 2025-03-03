@@ -8,33 +8,36 @@ import (
 	"goboy/soc"
 	"goboy/util"
 	"os"
+	"runtime"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
+	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-type goboy struct {
+func init() {
+	runtime.LockOSThread()
+}
+
+type Goboy struct {
 	soc    *soc.SOC
 	cart   *cart.Cart
 	on     bool
-	screen fyne.Window
 }
 
-func NewGoboy() *goboy {
-	return &goboy{
-		soc: soc.NewSOC(),
-		on:  false,
+func NewGoboy() *Goboy {
+	return &Goboy{
+		soc:    soc.NewSOC(),
+		on:     false,
 	}
 }
 
-func (g *goboy) Start() {
+func (g *Goboy) Start() {
 	g.on = true
 	go g.soc.Init()
 }
 
-func (g *goboy) LoadCart(fileName string) {
+var goboy Goboy = *NewGoboy()
+
+func (g *Goboy) LoadCart(fileName string) {
 	dump, dumpErr := os.ReadFile(fileName)
 	if dumpErr != nil {
 		fmt.Print(dumpErr)
@@ -77,12 +80,6 @@ func main() {
 		os.Exit(-1)
 	}
 
-	a := app.New()
-	w := a.NewWindow("goboy")
-	hello := widget.NewLabel("Hello World")
-	w.SetContent(hello)
-	w.ShowAndRun()
-	goboy := NewGoboy()
 	goboy.LoadCart(args[1])
 
 	fmt.Printf("Loading %s\n", args[1])
@@ -93,5 +90,33 @@ func main() {
 		os.Exit(-1)
 	}
 
+	err := glfw.Init()
+	if err != nil {
+		panic(err)
+	}
+	defer glfw.Terminate()
+
+	window, err := glfw.CreateWindow(640, 480, "Testing", nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	window.MakeContextCurrent()
+	window.SetKeyCallback(spacePressed)
+	
 	goboy.Start()
+
+	for goboy.on {
+		if window.ShouldClose() {
+			goboy.on = false
+		}
+		window.SwapBuffers()
+		glfw.PollEvents()
+	}
+}
+
+var spacePressed glfw.KeyCallback = func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if (key == glfw.KeySpace && action == glfw.Press) {
+		goboy.soc.Step()
+	}
 }
