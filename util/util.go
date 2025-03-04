@@ -13,6 +13,10 @@ func NotImplemented() uint8 {
 
 func WriteNilRegister(address uint16) {
 	fmt.Printf("Can't write to %04x\n", address)
+	if address >= 0x8000 && address <= 0x9FFF {
+		return
+	}
+	os.Exit(-1)
 }
 
 func ReadNilRegister(address uint16) {

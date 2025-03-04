@@ -5,7 +5,6 @@ import (
 	"goboy/cpu/registers"
 	"goboy/io"
 	"os"
-	"goboy/dbg"
 )
 
 const IF uint16 = 0xFF0F
@@ -15,14 +14,16 @@ type CPU struct {
 	Registers *registers.Registers
 	CurInst   *Instruction
 
-	Fetched     uint16
-	DestAddr    uint16
-	RelAddr     int8
-	Ticks       uint64
-	Halted      bool
-	EnablingIME bool
-	Read        func(uint16) uint8
-	Write       func(uint16, uint8)
+	Fetched        uint16
+	Paused         bool
+	DestAddr       uint16
+	RelAddr        int8
+	Ticks          uint64
+	Halted         bool
+	EnablingIME    bool
+	Read           func(uint16) uint8
+	Write          func(uint16, uint8)
+	CPUStateString string
 }
 
 func NewCPU() *CPU {
@@ -92,25 +93,54 @@ func (c *CPU) execute() {
 }
 
 func (c *CPU) process(opcode uint8) {
+	c.CPUStateString = ""
 	c.CurInst = &Instructions[opcode]
-	fmt.Printf("%-10s %02x %02x %02x ",
+	pc1 := c.Read(c.Registers.PC + 1)
+	pc2 := c.Read(c.Registers.PC + 2)
+	c.CPUStateString += fmt.Sprintf("%-10s %02x %02x %02x\t",
 		c.CurInst.Mnemonic,
 		opcode,
-		c.Read(c.Registers.PC+1),
-		c.Read(c.Registers.PC+2))
+		pc1,
+		pc2)
 	c.Registers.PC++
-	fmt.Printf("AF: 0b%04x BC: 0x%04x DE: 0x%04x HL: 0x%04x PC: 0x%04x SP: 0x%04x Ticks: %d\n",
-		c.Registers.GetAF(),
+	c.CurInst.AddrMode(c)
+	c.CurInst.Operation(c)
+	var z, n, h, carry string
+	if c.Registers.F&uint8(registers.ZERO_FLAG) == 0 {
+		z = "-"
+	} else {
+		z = "Z"
+	}
+	if c.Registers.F&uint8(registers.SUBTRACTION_FLAG) == 0 {
+		n = "-"
+	} else {
+		n = "N"
+	}
+	if c.Registers.F&uint8(registers.HALF_CARRY_FLAG) == 0 {
+		h = "-"
+	} else {
+		h = "H"
+	}
+	if c.Registers.F&uint8(registers.CARRY_FLAG) == 0 {
+		carry = "-"
+	} else {
+		carry = "C"
+	}
+	c.CPUStateString += fmt.Sprintf("A: 0x%02x F: %s%s%s%s BC: 0x%04x DE: 0x%04x HL: 0x%04x PC: 0x%04x SP: 0x%04x SB: 0x%04x SC: 0x%04x\n",
+		c.Registers.A,
+		z,
+		n,
+		h,
+		carry,
 		c.Registers.GetBC(),
 		c.Registers.GetDE(),
 		c.Registers.GetHL(),
 		c.Registers.PC,
 		c.Registers.SP,
-		c.Ticks)
-	c.CurInst.AddrMode(c)
-	c.CurInst.Operation(c)
-	dbg.Update(c.Read, c.Write)
-	dbg.Print()
+		c.Read(0xFF01),
+		c.Read(0xFF02))
+	// c.Ticks)
+	fmt.Print(c.CPUStateString)
 }
 
 func (c *CPU) Step() bool {
@@ -137,17 +167,17 @@ func (c *CPU) Step() bool {
 func (c *CPU) HandleInterupts() {
 	interuptsFlag := c.Read(IF)
 	interuptsEnabled := c.Read(IE)
-	if (c.CheckInterupt(0x40, interuptsFlag, interuptsEnabled, io.VBLANK)) {
+	if c.CheckInterupt(0x40, interuptsFlag, interuptsEnabled, io.VBLANK) {
 
-	} else if (c.CheckInterupt(0x48, interuptsFlag, interuptsEnabled, io.LCD)) {
+	} else if c.CheckInterupt(0x48, interuptsFlag, interuptsEnabled, io.LCD) {
 
-	} else if (c.CheckInterupt(0x50, interuptsFlag, interuptsEnabled, io.TIMER)) {
+	} else if c.CheckInterupt(0x50, interuptsFlag, interuptsEnabled, io.TIMER) {
 
-	} else if (c.CheckInterupt(0x58, interuptsFlag, interuptsEnabled, io.SERIAL)) {
+	} else if c.CheckInterupt(0x58, interuptsFlag, interuptsEnabled, io.SERIAL) {
 
-	} else if (c.CheckInterupt(0x60, interuptsFlag, interuptsEnabled, io.JOYPAD)) {
+	} else if c.CheckInterupt(0x60, interuptsFlag, interuptsEnabled, io.JOYPAD) {
 
-	} 
+	}
 }
 
 func (c *CPU) CheckInterupt(address uint16, inf uint8, ie uint8, interupt uint8) bool {
@@ -159,7 +189,7 @@ func (c *CPU) CheckInterupt(address uint16, inf uint8, ie uint8, interupt uint8)
 		return true
 	}
 
-	 return false
+	return false
 }
 
 func (c *CPU) CallInterupt(address uint16, interupt uint8) {
@@ -188,7 +218,6 @@ func (c *CPU) cpuCycles(cycles uint8) {
 
 // no operation
 func NONE(c *CPU) {
-	return
 }
 
 // 16 bit address
@@ -213,7 +242,8 @@ func A16_R(c *CPU) {
 }
 
 func E8(c *CPU) {
-	c.RelAddr = int8(c.Read(c.Registers.PC))
+	// fmt.Printf("0x%04x relAddr: 0x%04x(%d)", c.Registers.PC, c.Read(c.Registers.PC), int8(c.Read(c.Registers.PC)))
+	c.RelAddr = int8(c.Read(c.Registers.PC) & 0x00FF)
 	c.Registers.PC++
 	c.cpuCycles(1)
 }

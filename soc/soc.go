@@ -1,11 +1,16 @@
 package soc
 
 import (
+	"fmt"
 	"goboy/apu"
 	"goboy/bus"
 	"goboy/cpu"
+	"goboy/dbg"
+	"goboy/display"
 	"goboy/ppu"
 	"goboy/timer"
+
+	qt "github.com/mappu/miqt/qt6"
 )
 
 type ComponentEnum uint8
@@ -17,14 +22,16 @@ const (
 )
 
 type SOC struct {
-	APU     *apu.APU
-	CPU     *cpu.CPU
-	PPU     *ppu.PPU
-	Timer   *timer.Timer
-	Bus     *bus.Bus
-	running bool
-	paused  bool
-	ticks   uint64
+	APU        *apu.APU
+	CPU        *cpu.CPU
+	PPU        *ppu.PPU
+	Timer      *timer.Timer
+	Bus        *bus.Bus
+	Running    bool
+	Paused     bool
+	Ticks      uint64
+	TotalSteps uint64
+	Display    *display.Display
 }
 
 func NewSOC() *SOC {
@@ -42,25 +49,34 @@ func NewSOC() *SOC {
 }
 
 func (s *SOC) Init() {
+	// define soc display elements
 	s.CPU.Init()
 	// s.APU.Init()
 	// s.PPU.Init()
-	s.running = true
-	s.paused = false
-	s.ticks = 0
+	s.Running = true
+	s.Paused = true
+	s.Ticks = 0
 
-	for s.running {
-		if s.paused {
+	for s.Running {
+		if s.Paused {
 			continue
 		}
-		s.Step()
-		s.paused = true
-		s.ticks++
+		s.Step(1)
+		s.TotalSteps++
+		s.Ticks++
 	}
 }
 
-func (s *SOC) Step() {
-	s.CPU.Step()
-	// s.APU.Step()
-	// s.PPU.Step()
+func (s *SOC) Step(steps int) {
+	for i := 0; i < steps; i++ {
+		fmt.Printf("%x: ", s.TotalSteps)
+		s.CPU.Step()
+		UpdateTextEvent := display.NewUpdateTextEvent()
+		qt.QCoreApplication_PostEvent(s.Display.InstrText.QObject, UpdateTextEvent)
+		s.TotalSteps++
+		dbg.Update(s.Bus.Read, s.Bus.Write)
+		dbg.Print()
+		// s.APU.Step()
+		// s.PPU.Step()
+	}
 }

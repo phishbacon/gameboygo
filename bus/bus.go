@@ -103,7 +103,7 @@ func (b *Bus) Write(address uint16, value uint8) {
 		util.WriteNilRegister(address)
 	} else if address < 0xFF80 {
 		// I/O Registers
-		if address >= 0xFF07 && address <= 0xFF04 {
+		if address >= 0xFF00 && address <= 0xFF7F {
 			b.io.Write(address, value)
 		} else {
 			util.WriteNilRegister(address)

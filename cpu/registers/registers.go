@@ -104,7 +104,7 @@ func (r *Registers) SetAF(input uint16) {
 	//&0000000011111111
 	// 0000000011110000
 	r.A = uint8((input & 0xFF00) >> 8)
-	r.F = uint8(input & 0x00FF)
+	r.F = uint8(input & 0x00F0)
 }
 
 // Returns true if the flag is flipped, false otherwise
@@ -129,5 +129,6 @@ func (r *Registers) SetFlag(flag FlagMask, flipped bool) {
 		//&10110000
 		// 10110000
 		r.F = r.F & (^uint8(flag) & 0xF0)
+		r.F &= 0xF0
 	}
 }

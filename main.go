@@ -5,10 +5,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"goboy/cart"
+	"goboy/display"
 	"goboy/soc"
 	"goboy/util"
 	"os"
 	"runtime"
+	"strconv"
+
 	qt "github.com/mappu/miqt/qt6"
 )
 
@@ -17,24 +20,83 @@ func init() {
 }
 
 type Goboy struct {
-	soc    *soc.SOC
-	cart   *cart.Cart
-	on     bool
+	soc     *soc.SOC
+	cart    *cart.Cart
+	on      bool
+	display *display.Display
 }
 
-func NewGoboy() *Goboy {
-	return &Goboy{
-		soc:    soc.NewSOC(),
-		on:     false,
-	}
+func NewGoboy(args []string) *Goboy {
+	qt.NewQApplication(args)
+
+	goboy := &Goboy{}
+	dis := display.NewDisplay()
+	soc := soc.NewSOC()
+	goboy.soc = soc
+	goboy.on = false
+	goboy.display = dis
+	goboy.soc.Display = dis
+
+	dis.Window.Show()
+	dis.Widget.SetFixedWidth(1000)
+	dis.Window.OnCloseEvent(func(super func(event *qt.QCloseEvent), event *qt.QCloseEvent) {
+		goboy.on = false
+		event.Accept() // Allow the window to close (use event.Ignore() to prevent closing)
+		super(event)
+	})
+
+	// Layout the ui
+	btn := qt.NewQPushButton3("Step")
+	stepInput := qt.NewQLineEdit2()
+	btn2 := qt.NewQPushButton3("Pause")
+	currStepValues := qt.NewQPlainTextEdit2()
+	goboy.display.InstrText = currStepValues
+	currStepValues.SetReadOnly(true)
+
+	btn.OnPressed(func() {
+		steps := stepInput.Text()
+		if steps == "" {
+			goboy.soc.Step(1)
+		} else {
+			stepsInt, err := strconv.Atoi(steps)
+			if err != nil {
+				panic(err)
+			}
+			goboy.soc.Step(stepsInt)
+		}
+	})
+	dis.Layout.AddWidget2(btn.QWidget, 0, 0)
+
+	stepInput.SetPlaceholderText("How many?")
+	intValidator := qt.NewQIntValidator2(0, 100)
+	stepInput.SetValidator(intValidator.QValidator)
+	dis.Layout.AddWidget2(stepInput.QWidget, 0, 1)
+
+	btn2.OnPressed(func() {
+		goboy.soc.Paused = !goboy.soc.Paused
+	})
+	dis.Layout.AddWidget2(btn2.QWidget, 1, 0)
+
+	dis.Layout.AddWidget2(currStepValues.QWidget, 3, 0)
+	dis.Layout.SetColumnStretch(0, 3)
+	dis.Layout.SetRowStretch(3, 1)
+	currStepValues.OnEvent(func(super func(e *qt.QEvent) bool, e *qt.QEvent) bool {
+		if e.Type() == qt.QEvent__Type(display.UpdateTextEventType) {
+			if goboy.soc.CPU.CPUStateString != "" {
+				currStepValues.InsertPlainText(goboy.soc.CPU.CPUStateString)
+			}
+			return true
+		}
+		return super(e)
+	})
+	return goboy
 }
 
 func (g *Goboy) Start() {
 	g.on = true
 	go g.soc.Init()
+	qt.QApplication_Exec()
 }
-
-var goboy Goboy = *NewGoboy()
 
 func (g *Goboy) LoadCart(fileName string) {
 	dump, dumpErr := os.ReadFile(fileName)
@@ -73,8 +135,10 @@ func (g *Goboy) LoadCart(fileName string) {
 }
 
 func main() {
-	qt.NewQApplication(os.Args)
+
 	args := os.Args
+
+	goboy := NewGoboy(args)
 	if len(args) < 2 {
 		fmt.Println("Rom required")
 		os.Exit(-1)
@@ -95,4 +159,3 @@ func main() {
 	for goboy.on {
 	}
 }
-
