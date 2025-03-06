@@ -1,6 +1,8 @@
 package registers
 
-type FlagMask uint8
+import "fmt"
+
+type FlagMask uint16
 
 const (
 	ZERO_FLAG        FlagMask = 0b10000000
@@ -9,117 +11,190 @@ const (
 	CARRY_FLAG       FlagMask = 0b00010000
 )
 
+type Reg uint8
+
+const (
+	A Reg = iota
+	F Reg = iota
+	B Reg = iota
+	C Reg = iota
+	D Reg = iota
+	E Reg = iota
+	H Reg = iota
+	L Reg = iota
+)
+
 type Registers struct {
-	A   uint8
-	B   uint8
-	C   uint8
-	D   uint8
-	E   uint8
-	F   uint8 // Flags register znhc 0000 | Zero, Subtraction, Half Carry, Carry
-	H   uint8
-	L   uint8
-	SP  uint16 // Stack Pointer
-	PC  uint16 // Program Counter
-	IME bool   // Interrupt master enable
+	af  uint16
+	bc  uint16
+	de  uint16
+	hl  uint16
+	sp  uint16 // Stack Pointer
+	pc  uint16 // Program Counter
+	ime bool   // Interrupt master enable
 }
 
-// B = 00000001 C = 11110000 return 00000001 11110000
+func (r *Registers) GetIME() bool {
+	return r.ime
+}
+
+func (r *Registers) SetIME(value bool) {
+	r.ime = value
+}
+
 func (r *Registers) GetBC() uint16 {
-	return (uint16(r.B) << 8) | uint16(r.C)
+	return r.bc
 }
 
-// input = 00000001 11110000 B = 00000001, C = 11110000
+func (r *Registers) DecBC() {
+	r.bc--
+}
+
+func (r *Registers) IncBC() {
+	r.bc++
+}
+
 func (r *Registers) SetBC(input uint16) {
-	// B
-	// 0000000111110000
-	//&1111111100000000
-	// 0000000100000000
-	// >> 8
-	// 0000000000000001
-	// C
-	// 0000000111110000
-	//&0000000011111111
-	// 0000000011110000
-	r.B = uint8((input & 0xFF00) >> 8)
-	r.C = uint8(input & 0x00FF)
+	r.bc = input
 }
 
-// D = 00000001 E = 11110000 return 00000001 11110000
 func (r *Registers) GetDE() uint16 {
-	return (uint16(r.D) << 8) | uint16(r.E)
+	return r.de
 }
 
-// input = 00000001 11110000 D = 00000001, E = 11110000
+func (r *Registers) DecDE() {
+	r.de--
+}
+
+func (r *Registers) IncDE() {
+	r.de++
+}
+
 func (r *Registers) SetDE(input uint16) {
-	// D
-	// 0000000111110000
-	//&1111111100000000
-	// 0000000100000000
-	// >> 8
-	// 0000000000000001
-	// E
-	// 0000000111110000
-	//&0000000011111111
-	// 0000000011110000
-	r.D = uint8((input & 0xFF00) >> 8)
-	r.E = uint8(input & 0x00FF)
+	r.de = input
 }
 
-// H = 00000001 L = 11110000 return 00000001 11110000
 func (r *Registers) GetHL() uint16 {
-	return (uint16(r.H) << 8) | uint16(r.L)
+	return r.hl
 }
 
-// input = 00000001 11110000 H = 00000001, L = 11110000
+func (r *Registers) DecHL() {
+	r.hl--
+}
+
+func (r *Registers) IncHL() {
+	r.hl++
+}
+
 func (r *Registers) SetHL(input uint16) {
-	// H
-	// 0000000111110000
-	//&1111111100000000
-	// 0000000100000000
-	// >> 8
-	// 0000000000000001
-	// L
-	// 0000000111110000
-	//&0000000011111111
-	// 0000000011110000
-	r.H = uint8((input & 0xFF00) >> 8)
-	r.L = uint8(input & 0x00FF)
+	r.hl = input
 }
 
-// A = 00000001 F = 11110000 return 00000001 11110000
 func (r *Registers) GetAF() uint16 {
-	return (uint16(r.A) << 8) | uint16(r.F)
+	return r.af
 }
 
-// input = 00000001 11110000 A = 00000001, F = 11110000
 func (r *Registers) SetAF(input uint16) {
-	// A
-	// 0000000111110000
-	//&1111111100000000
-	// 0000000100000000
-	// >> 8
-	// 0000000000000001
-	// F
-	// 0000000111110000
-	//&0000000011111111
-	// 0000000011110000
-	r.A = uint8((input & 0xFF00) >> 8)
-	r.F = uint8(input & 0x00F0)
+	r.af = input & 0xFFF0
+}
+
+func (r *Registers) GetSP() uint16 {
+	return r.sp
+}
+
+func (r *Registers) DecSP() {
+	r.sp--
+}
+
+func (r *Registers) IncSP() {
+	r.sp++
+}
+
+func (r *Registers) SetSP(input uint16) {
+	r.sp = input
+}
+
+func (r *Registers) GetPC() uint16 {
+	return r.pc
+}
+
+func (r *Registers) DecPC() {
+	r.pc--
+}
+
+func (r *Registers) IncPC() {
+	r.pc++
+}
+func (r *Registers) SetPC(input uint16) {
+	r.pc = input
 }
 
 // Returns true if the flag is flipped, false otherwise
 func (r *Registers) GetFlag(flag FlagMask) bool {
-	if r.F&uint8(flag) > 0 {
+	if r.af&uint16(flag) > 0 {
 		return true
 	} else {
 		return false
 	}
 }
 
+func (r *Registers) GetReg(reg Reg) uint8 {
+	switch reg {
+	case A:
+		return uint8((r.af & 0xFF00) >> 8)
+	case F:
+		return uint8(r.af & 0x00F0)
+	case B:
+		return uint8((r.bc & 0xFF00) >> 8)
+	case C:
+		return uint8(r.bc & 0x00FF)
+	case D:
+		return uint8((r.de & 0xFF00) >> 8)
+	case E:
+		return uint8(r.de & 0x00FF)
+	case H:
+		return uint8((r.hl & 0xFF00) >> 8)
+	case L:
+		return uint8(r.hl & 0x00FF)
+	default:
+		fmt.Println("Invalid register")
+		return 0
+	}
+}
+
+func (r *Registers) SetReg(reg Reg, input uint8) {
+	switch reg {
+	case A:
+		r.af = uint16(input)<<8 | r.af&0x00F0
+	case F:
+		r.af = r.af&0xFF00 | uint16(input)&0x00F0
+	case B:
+		r.bc = uint16(input)<<8 | r.bc&0x00FF
+	case C:
+		r.bc = r.bc&0xFF00 | uint16(input)&0x00FF
+	case D:
+		r.de = uint16(input)<<8 | r.de&0x00FF
+	case E:
+		r.de = r.de&0xFF00 | uint16(input)&0x00FF
+	case H:
+		r.hl = uint16(input)<<8 | r.hl&0x00FF
+	case L:
+		r.hl = r.hl&0xFF00 | uint16(input)&0x00FF
+	}
+}
+
+func (r *Registers) IncReg(reg Reg) {
+	r.SetReg(reg, r.GetReg(reg) + 1)
+}
+
+func (r *Registers) DecReg(reg Reg) {
+	r.SetReg(reg, r.GetReg(reg) - 1)
+}
+
 // Sets the given flag to true or false
 func (r *Registers) SetFlag(flag FlagMask, flipped bool) {
 	if flipped {
-		r.F = r.F | uint8(flag)
+		r.af = r.af | uint16(flag)
 	} else if !flipped {
 		// F
 		// 11110000
@@ -128,7 +203,8 @@ func (r *Registers) SetFlag(flag FlagMask, flipped bool) {
 		// 11110000
 		//&10110000
 		// 10110000
-		r.F = r.F & (^uint8(flag) & 0xF0)
-		r.F &= 0xF0
+		f := r.af & 0x00FF
+		f = f & (^uint16(flag) & 0x00F0)
+		r.af = (r.af & 0xFF00) | f
 	}
 }

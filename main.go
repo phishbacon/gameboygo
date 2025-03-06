@@ -35,7 +35,6 @@ func NewGoboy(args []string) *Goboy {
 	goboy.soc = soc
 	goboy.on = false
 	goboy.display = dis
-	goboy.soc.Display = dis
 
 	dis.Window.Show()
 	dis.Widget.SetFixedWidth(1000)
@@ -80,15 +79,6 @@ func NewGoboy(args []string) *Goboy {
 	dis.Layout.AddWidget2(currStepValues.QWidget, 3, 0)
 	dis.Layout.SetColumnStretch(0, 3)
 	dis.Layout.SetRowStretch(3, 1)
-	currStepValues.OnEvent(func(super func(e *qt.QEvent) bool, e *qt.QEvent) bool {
-		if e.Type() == qt.QEvent__Type(display.UpdateTextEventType) {
-			if goboy.soc.CPU.CPUStateString != "" {
-				currStepValues.InsertPlainText(goboy.soc.CPU.CPUStateString)
-			}
-			return true
-		}
-		return super(e)
-	})
 	return goboy
 }
 

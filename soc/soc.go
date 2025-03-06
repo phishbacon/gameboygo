@@ -6,11 +6,8 @@ import (
 	"goboy/bus"
 	"goboy/cpu"
 	"goboy/dbg"
-	"goboy/display"
 	"goboy/ppu"
 	"goboy/timer"
-
-	qt "github.com/mappu/miqt/qt6"
 )
 
 type ComponentEnum uint8
@@ -31,7 +28,6 @@ type SOC struct {
 	Paused     bool
 	Ticks      uint64
 	TotalSteps uint64
-	Display    *display.Display
 }
 
 func NewSOC() *SOC {
@@ -71,8 +67,6 @@ func (s *SOC) Step(steps int) {
 	for i := 0; i < steps; i++ {
 		fmt.Printf("%x: ", s.TotalSteps)
 		s.CPU.Step()
-		UpdateTextEvent := display.NewUpdateTextEvent()
-		qt.QCoreApplication_PostEvent(s.Display.InstrText.QObject, UpdateTextEvent)
 		s.TotalSteps++
 		dbg.Update(s.Bus.Read, s.Bus.Write)
 		dbg.Print()
