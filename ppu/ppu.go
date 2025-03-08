@@ -1,8 +1,13 @@
 package ppu
 
+import "github.com/phishbacon/gameboygo/bus"
+
 type PPU struct {
+	bus *bus.Bus
 }
 
-func NewPPU() *PPU {
-	return &PPU{}
+func NewPPU(bus *bus.Bus) *PPU {
+	return &PPU{
+		bus: bus,
+	}
 }

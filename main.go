@@ -5,40 +5,41 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	"runtime"
 
-	rl "github.com/gen2brain/raylib-go/raylib"
+	"github.com/jupiterrider/purego-sdl3/sdl"
 	"github.com/phishbacon/gameboygo/cart"
+	"github.com/phishbacon/gameboygo/display"
 	"github.com/phishbacon/gameboygo/soc"
 	"github.com/phishbacon/gameboygo/util"
 )
 
-func init() {
-	runtime.LockOSThread()
+type Gameboy struct {
+	soc     *soc.SOC
+	cart    *cart.Cart
+	running bool
+	paused  bool
+	display *display.Display
 }
 
-type Goboy struct {
-	soc  *soc.SOC
-	cart *cart.Cart
-	on   bool
-}
+func NewGoboy(args []string) *Gameboy {
 
-func NewGoboy(args []string) *Goboy {
-
-	goboy := &Goboy{}
+	goboy := &Gameboy{}
 	soc := soc.NewSOC()
+	display := new(display.Display)
 	goboy.soc = soc
-	goboy.on = false
+	goboy.display = display
+	goboy.running = false
 
 	return goboy
 }
 
-func (g *Goboy) Start() {
-	g.on = true
+func (g *Gameboy) Start() {
+	g.running = true
+	g.display.Start()
 	go g.soc.Init()
 }
 
-func (g *Goboy) LoadCart(fileName string) {
+func (g *Gameboy) LoadCart(fileName string) {
 	dump, dumpErr := os.ReadFile(fileName)
 	if dumpErr != nil {
 		fmt.Print(dumpErr)
@@ -46,7 +47,7 @@ func (g *Goboy) LoadCart(fileName string) {
 	}
 	// give bus reference to cart so soc components can read from it
 	g.cart = (*cart.Cart)(&dump)
-	g.soc.Bus.ConnectCart(&dump)
+	g.soc.ConnectCart(&dump)
 
 	var cartHeader cart.CartHeader
 	headerErr := binary.Read(bytes.NewReader((*g.cart)[0x0100:0x0150]), binary.LittleEndian, &cartHeader)
@@ -78,44 +79,30 @@ func main() {
 
 	args := os.Args
 
-	goboy := NewGoboy(args)
+	gameboy := NewGoboy(args)
 	if len(args) < 2 {
 		fmt.Println("Rom required")
 		os.Exit(-1)
 	}
 
-	goboy.LoadCart(args[1])
+	gameboy.LoadCart(args[1])
 
 	fmt.Printf("Loading %s\n", args[1])
-	if goboy.cart.VerifyLogoDump() {
+	if gameboy.cart.VerifyLogoDump() {
 		// jump to address 0x0100
 	} else {
 		fmt.Println("Failed to verify logo")
 		os.Exit(-1)
 	}
-	rl.InitWindow(1200, 450, "gameboygo")
-	defer rl.CloseWindow()
-	rl.SetTargetFPS(60)
 
-	goboy.Start()
-
-	for !rl.WindowShouldClose() {
-		if rl.IsKeyPressed(rl.KeyEnter) && goboy.soc.Paused {
-			goboy.soc.Step()
-		}
-
-		if rl.IsKeyPressed(rl.KeySpace) {
-			goboy.soc.Paused = !goboy.soc.Paused
-		}
-		rl.BeginDrawing()
-
-		rl.ClearBackground(rl.RayWhite)
-
-		if goboy.soc.CpuStateReadyForReading {
-			text := goboy.soc.CpuStateString
-			rl.DrawText(text, 10, 0, 30, rl.Black)
-		}
-
-		rl.EndDrawing()
+	gameboy.Start()
+	sdl.Init(sdl.InitVideo)
+	defer sdl.Quit()
+	defer sdl.DestroyRenderer(gameboy.display.ScreenRenderer)
+	defer sdl.DestroyWindow(gameboy.display.Screen)
+	for gameboy.display.On {
+		gameboy.soc.Paused = gameboy.display.Paused
+		gameboy.display.EventLoop()
+		gameboy.display.Render()
 	}
 }

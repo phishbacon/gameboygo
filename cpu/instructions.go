@@ -19,7 +19,7 @@ type Instruction struct {
 func (c *CPU) cpuCycles(cycles uint8) {
 	var n int = int(cycles) * 4
 	for i := 0; i < n; i++ {
-		c.Ticks++
+		c.ticks++
 	}
 	return
 }
@@ -31,12 +31,12 @@ func NONE(c *CPU) {
 // load value pointed to by 16 bit address in to register R
 func R_A16(c *CPU) {
 	// grab low and hi byte from adddress pc and pc +1
-	lo := c.Read(c.Registers.PC)
+	lo := c.bus.Read(c.registers.PC)
 	c.cpuCycles(1)
-	hi := c.Read(c.Registers.PC + 1)
+	hi := c.bus.Read(c.registers.PC + 1)
 	c.cpuCycles(1)
-	c.Registers.PC += 2
-	c.Fetched = (uint16(hi) << 8) | uint16(lo)
+	c.registers.PC += 2
+	c.fetched = (uint16(hi) << 8) | uint16(lo)
 }
 
 // load immediate 16 bit value into R
@@ -47,26 +47,26 @@ var A16_R AddrMode = R_A16
 
 // grab signed 8 bit data
 func E8(c *CPU) {
-	// fmt.Printf("0x%04x relAddr: 0x%04x(%d)", c.Registers.PC, c.Read(c.Registers.PC), int8(c.Read(c.Registers.PC)))
-	c.RelAddr = int8(c.Read(c.Registers.PC) & 0x00FF)
-	c.Registers.PC++
+	// fmt.Printf("0x%04x relAddr: 0x%04x(%d)", c.registers.PC, c.bus.Read(c.registers.PC), int8(c.bus.Read(c.registers.PC)))
+	c.relAddr = int8(c.bus.Read(c.registers.PC) & 0x00FF)
+	c.registers.PC++
 	c.cpuCycles(1)
 }
 
 // load immediate 8 value into R
 func R_N8(c *CPU) {
-	lo := c.Read(c.Registers.PC)
+	lo := c.bus.Read(c.registers.PC)
 	c.cpuCycles(1)
-	c.Registers.PC++
-	c.Fetched = uint16(lo)
+	c.registers.PC++
+	c.fetched = uint16(lo)
 }
 
 // load register value into high ram  address A8 + FF00
 func A8_A(c *CPU) {
-	lo := uint16(c.Read(c.Registers.PC)) + 0xFF00
+	lo := uint16(c.bus.Read(c.registers.PC)) + 0xFF00
 	c.cpuCycles(1)
-	c.Registers.PC++
-	c.Fetched = lo
+	c.registers.PC++
+	c.fetched = lo
 }
 
 // load value pointed to by high ram address into A
@@ -74,9 +74,9 @@ var A_A8 AddrMode = A8_A
 
 //
 // func A_A8(c *CPU) {
-// 	lo := uint16(c.Read(c.Registers.GetPC())) + 0xFF00
+// 	lo := uint16(c.bus.Read(c.registers.GetPC())) + 0xFF00
 // 	c.cpuCycles(1)
-// 	c.Registers.IncPC()
+// 	c.registers.IncPC()
 // 	c.Fetched = lo
 // }
 
@@ -137,56 +137,56 @@ func FullCarryAdc(a uint8, b uint8, c uint8) bool {
 }
 
 func (c *CPU) SetDecRegFlags(register uint8) {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, true)
-	c.Registers.SetFlag(ZERO_FLAG, register-1 == 0)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, register&0x000F == 0x0000)
+	c.registers.SetFlag(SUBTRACTION_FLAG, true)
+	c.registers.SetFlag(ZERO_FLAG, register-1 == 0)
+	c.registers.SetFlag(HALF_CARRY_FLAG, register&0x000F == 0x0000)
 }
 
 func (c *CPU) SetIncRegFlags(register uint8) {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(ZERO_FLAG, register+1 == 0)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, register&0x000F == 0x000F)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(ZERO_FLAG, register+1 == 0)
+	c.registers.SetFlag(HALF_CARRY_FLAG, register&0x000F == 0x000F)
 }
 
 func (c *CPU) SetDecFlags(value uint8) {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, true)
-	c.Registers.SetFlag(ZERO_FLAG, value-1 == 0)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, value&0x000F == 0x0000)
+	c.registers.SetFlag(SUBTRACTION_FLAG, true)
+	c.registers.SetFlag(ZERO_FLAG, value-1 == 0)
+	c.registers.SetFlag(HALF_CARRY_FLAG, value&0x000F == 0x0000)
 }
 
 func (c *CPU) SetIncFlags(value uint8) {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(ZERO_FLAG, value+1 == 0)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, value&0x000F == 0x000F)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(ZERO_FLAG, value+1 == 0)
+	c.registers.SetFlag(HALF_CARRY_FLAG, value&0x000F == 0x000F)
 }
 
 func (c *CPU) SetRotateFlags(registerVal uint8, leftOrRight string) {
-	c.Registers.SetFlag(ZERO_FLAG, false)
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, false)
+	c.registers.SetFlag(ZERO_FLAG, false)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, false)
 
 	switch leftOrRight {
 	case "L":
 		carryBit := registerVal >> 7
 		if carryBit == 0 {
-			c.Registers.SetFlag(CARRY_FLAG, false)
+			c.registers.SetFlag(CARRY_FLAG, false)
 		} else if carryBit == 1 {
-			c.Registers.SetFlag(CARRY_FLAG, true)
+			c.registers.SetFlag(CARRY_FLAG, true)
 		}
 	case "R":
 		carryBit := registerVal & 0x0001
 		if carryBit == 0 {
-			c.Registers.SetFlag(CARRY_FLAG, false)
+			c.registers.SetFlag(CARRY_FLAG, false)
 		} else if carryBit == 1 {
-			c.Registers.SetFlag(CARRY_FLAG, true)
+			c.registers.SetFlag(CARRY_FLAG, true)
 		}
 	}
 }
 func (c *CPU) SetCBRotateFlags(registerVal uint8, leftOrRight string, throughCarry bool) uint8 {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, false)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, false)
 	var oldCarry uint8
-	if c.Registers.GetFlag(CARRY_FLAG) {
+	if c.registers.GetFlag(CARRY_FLAG) {
 		oldCarry = 1
 	}
 
@@ -194,9 +194,9 @@ func (c *CPU) SetCBRotateFlags(registerVal uint8, leftOrRight string, throughCar
 	case "L":
 		carryBit := registerVal >> 7
 		if carryBit == 0 {
-			c.Registers.SetFlag(CARRY_FLAG, false)
+			c.registers.SetFlag(CARRY_FLAG, false)
 		} else if carryBit == 1 {
-			c.Registers.SetFlag(CARRY_FLAG, true)
+			c.registers.SetFlag(CARRY_FLAG, true)
 		}
 		if throughCarry {
 			registerVal = (registerVal << 1) | oldCarry
@@ -206,9 +206,9 @@ func (c *CPU) SetCBRotateFlags(registerVal uint8, leftOrRight string, throughCar
 	case "R":
 		carryBit := registerVal & 0x0001
 		if carryBit == 0 {
-			c.Registers.SetFlag(CARRY_FLAG, false)
+			c.registers.SetFlag(CARRY_FLAG, false)
 		} else if carryBit == 1 {
-			c.Registers.SetFlag(CARRY_FLAG, true)
+			c.registers.SetFlag(CARRY_FLAG, true)
 		}
 		if throughCarry {
 			registerVal = (registerVal >> 1) | (oldCarry << 7)
@@ -216,29 +216,29 @@ func (c *CPU) SetCBRotateFlags(registerVal uint8, leftOrRight string, throughCar
 			registerVal = (registerVal >> 1) | (registerVal << 7)
 		}
 	}
-	c.Registers.SetFlag(ZERO_FLAG, registerVal == 0)
+	c.registers.SetFlag(ZERO_FLAG, registerVal == 0)
 	return registerVal
 }
 
 func (c *CPU) SetShiftFlags(registerVal uint8, leftOrRight string, logically bool) uint8 {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, false)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, false)
 
 	switch leftOrRight {
 	case "L":
 		carryBit := registerVal >> 7
 		if carryBit == 0 {
-			c.Registers.SetFlag(CARRY_FLAG, false)
+			c.registers.SetFlag(CARRY_FLAG, false)
 		} else if carryBit == 1 {
-			c.Registers.SetFlag(CARRY_FLAG, true)
+			c.registers.SetFlag(CARRY_FLAG, true)
 		}
 		registerVal <<= 1
 	case "R":
 		carryBit := registerVal & 0x0001
 		if carryBit == 0 {
-			c.Registers.SetFlag(CARRY_FLAG, false)
+			c.registers.SetFlag(CARRY_FLAG, false)
 		} else if carryBit == 1 {
-			c.Registers.SetFlag(CARRY_FLAG, true)
+			c.registers.SetFlag(CARRY_FLAG, true)
 		}
 		if logically {
 			registerVal >>= 1
@@ -248,14 +248,14 @@ func (c *CPU) SetShiftFlags(registerVal uint8, leftOrRight string, logically boo
 			registerVal = (registerVal >> 1) | (registerVal & 0x80)
 		}
 	}
-	c.Registers.SetFlag(ZERO_FLAG, registerVal == 0)
+	c.registers.SetFlag(ZERO_FLAG, registerVal == 0)
 	return registerVal
 }
 
 func (c *CPU) SetSwapFlags(registerVal uint8) uint8 {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, false)
-	c.Registers.SetFlag(CARRY_FLAG, false)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, false)
+	c.registers.SetFlag(CARRY_FLAG, false)
 
 	highNibble := registerVal >> 4 & 0x000F
 	lowNibble := registerVal & 0x000F
@@ -264,8 +264,8 @@ func (c *CPU) SetSwapFlags(registerVal uint8) uint8 {
 }
 
 func (c *CPU) SetBitFlags(registerVal uint8, bit uint8) {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, true)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, true)
 	var i uint8
 	var bitValue uint8 = 1
 	for i = 0; i < bit; i++ {
@@ -274,7 +274,7 @@ func (c *CPU) SetBitFlags(registerVal uint8, bit uint8) {
 	// 00101110
 	//&00010000
 	// 00000000
-	c.Registers.SetFlag(ZERO_FLAG, registerVal&bitValue == 0)
+	c.registers.SetFlag(ZERO_FLAG, registerVal&bitValue == 0)
 }
 func (c *CPU) SetBit(registerVal uint8, bit uint8, set bool) uint8 {
 	var i uint8
@@ -317,66 +317,66 @@ func FullCarryAdd16(a uint16, b uint16) bool {
 }
 
 func (c *CPU) SetAddFlags(a, b uint8) {
-	c.Registers.SetFlag(ZERO_FLAG, a+b == 0)
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, HalfCarryAdd(a, b))
-	c.Registers.SetFlag(CARRY_FLAG, FullCarryAdd(a, b))
+	c.registers.SetFlag(ZERO_FLAG, a+b == 0)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, HalfCarryAdd(a, b))
+	c.registers.SetFlag(CARRY_FLAG, FullCarryAdd(a, b))
 }
 
 func (c *CPU) SetSubFlags(a, b uint8) {
-	c.Registers.SetFlag(ZERO_FLAG, a-b == 0)
-	c.Registers.SetFlag(SUBTRACTION_FLAG, true)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, HalfCarrySub(a, b))
-	c.Registers.SetFlag(CARRY_FLAG, FullCarrySub(a, b))
+	c.registers.SetFlag(ZERO_FLAG, a-b == 0)
+	c.registers.SetFlag(SUBTRACTION_FLAG, true)
+	c.registers.SetFlag(HALF_CARRY_FLAG, HalfCarrySub(a, b))
+	c.registers.SetFlag(CARRY_FLAG, FullCarrySub(a, b))
 }
 func (c *CPU) SetCpFlags(a, b uint8) {
-	c.Registers.SetFlag(ZERO_FLAG, a-b == 0)
-	c.Registers.SetFlag(SUBTRACTION_FLAG, true)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, HalfCarrySub(a, b))
-	c.Registers.SetFlag(CARRY_FLAG, b > a)
+	c.registers.SetFlag(ZERO_FLAG, a-b == 0)
+	c.registers.SetFlag(SUBTRACTION_FLAG, true)
+	c.registers.SetFlag(HALF_CARRY_FLAG, HalfCarrySub(a, b))
+	c.registers.SetFlag(CARRY_FLAG, b > a)
 }
 
 func (c *CPU) SetAdcFlags(a, b uint8) uint8 {
 	var carryFlag uint8
-	if c.Registers.GetFlag(CARRY_FLAG) {
+	if c.registers.GetFlag(CARRY_FLAG) {
 		carryFlag = 1
 	}
-	c.Registers.SetFlag(ZERO_FLAG, a+b+carryFlag == 0)
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, HalfCarryAdc(a, b, carryFlag))
-	c.Registers.SetFlag(CARRY_FLAG, FullCarryAdc(a, b, carryFlag))
+	c.registers.SetFlag(ZERO_FLAG, a+b+carryFlag == 0)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, HalfCarryAdc(a, b, carryFlag))
+	c.registers.SetFlag(CARRY_FLAG, FullCarryAdc(a, b, carryFlag))
 
 	return carryFlag
 }
 
 func (c *CPU) SetSbcFlags(a, b uint8) uint8 {
 	var carryFlag uint8
-	if c.Registers.GetFlag(CARRY_FLAG) {
+	if c.registers.GetFlag(CARRY_FLAG) {
 		carryFlag = 1
 	}
-	c.Registers.SetFlag(ZERO_FLAG, a-b-carryFlag == 0)
-	c.Registers.SetFlag(SUBTRACTION_FLAG, true)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, HalfCarrySbc(a, b, carryFlag))
-	c.Registers.SetFlag(CARRY_FLAG, FullCarrySbc(a, b, carryFlag))
+	c.registers.SetFlag(ZERO_FLAG, a-b-carryFlag == 0)
+	c.registers.SetFlag(SUBTRACTION_FLAG, true)
+	c.registers.SetFlag(HALF_CARRY_FLAG, HalfCarrySbc(a, b, carryFlag))
+	c.registers.SetFlag(CARRY_FLAG, FullCarrySbc(a, b, carryFlag))
 
 	return carryFlag
 }
 func (c *CPU) SetAddFlags16(a uint16, b uint16) {
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, HalfCarryAdd16(a, b))
-	c.Registers.SetFlag(CARRY_FLAG, FullCarryAdd16(a, b))
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, HalfCarryAdd16(a, b))
+	c.registers.SetFlag(CARRY_FLAG, FullCarryAdd16(a, b))
 }
 func (c *CPU) SetAndFlags(a uint8) {
-	c.Registers.SetFlag(ZERO_FLAG, a == 0)
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, true)
-	c.Registers.SetFlag(CARRY_FLAG, false)
+	c.registers.SetFlag(ZERO_FLAG, a == 0)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, true)
+	c.registers.SetFlag(CARRY_FLAG, false)
 }
 func (c *CPU) SetXorFlags(a uint8) {
-	c.Registers.SetFlag(ZERO_FLAG, a == 0)
-	c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-	c.Registers.SetFlag(HALF_CARRY_FLAG, false)
-	c.Registers.SetFlag(CARRY_FLAG, false)
+	c.registers.SetFlag(ZERO_FLAG, a == 0)
+	c.registers.SetFlag(SUBTRACTION_FLAG, false)
+	c.registers.SetFlag(HALF_CARRY_FLAG, false)
+	c.registers.SetFlag(CARRY_FLAG, false)
 }
 
 var Instructions = [0x0100]Instruction{
@@ -395,7 +395,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetBC(c.Fetched)
+			c.registers.SetBC(c.fetched)
 			return 0
 		},
 	},
@@ -405,7 +405,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetBC(), c.Registers.A)
+			c.bus.Write(c.registers.GetBC(), c.registers.A)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -416,7 +416,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetBC(c.Registers.GetBC() + 1)
+			c.registers.SetBC(c.registers.GetBC() + 1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -427,8 +427,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetIncRegFlags(c.Registers.A)
-			c.Registers.A++
+			c.SetIncRegFlags(c.registers.A)
+			c.registers.A++
 			return 0
 		},
 	},
@@ -438,8 +438,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetDecRegFlags(c.Registers.B)
-			c.Registers.B--
+			c.SetDecRegFlags(c.registers.B)
+			c.registers.B--
 			return 0
 		},
 	},
@@ -449,7 +449,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.B = uint8(c.Fetched)
+			c.registers.B = uint8(c.fetched)
 			return 0
 		},
 	},
@@ -459,13 +459,13 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
+			a := c.registers.A
 			c.SetRotateFlags(a, "L")
 			// a = 11101000
 			// a << 1 = 11010000
 			// a >> 7 = 00000001
 			//          11010001
-			c.Registers.A = (a << 1) | (a >> 7)
+			c.registers.A = (a << 1) | (a >> 7)
 			return 0
 		},
 	},
@@ -475,11 +475,11 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{20},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) uint8 {
-			lo := uint8(c.Registers.SP & 0x00FF)
-			hi := uint8(c.Registers.SP >> 8)
-			c.Write(c.Fetched, lo)
+			lo := uint8(c.registers.SP & 0x00FF)
+			hi := uint8(c.registers.SP >> 8)
+			c.bus.Write(c.fetched, lo)
 			c.cpuCycles(1)
-			c.Write(c.Fetched+1, hi)
+			c.bus.Write(c.fetched+1, hi)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -490,8 +490,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetAddFlags16(c.Registers.GetHL(), c.Registers.GetBC())
-			c.Registers.SetHL(c.Registers.GetHL() + c.Registers.GetBC())
+			c.SetAddFlags16(c.registers.GetHL(), c.registers.GetBC())
+			c.registers.SetHL(c.registers.GetHL() + c.registers.GetBC())
 			c.cpuCycles(1)
 			return 0
 		},
@@ -502,7 +502,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Read(c.Registers.GetBC())
+			c.registers.A = c.bus.Read(c.registers.GetBC())
 			c.cpuCycles(1)
 			return 0
 		},
@@ -513,7 +513,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetBC(c.Registers.GetBC() - 1)
+			c.registers.SetBC(c.registers.GetBC() - 1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -524,8 +524,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetIncRegFlags(c.Registers.C)
-			c.Registers.C++
+			c.SetIncRegFlags(c.registers.C)
+			c.registers.C++
 			return 0
 		},
 	},
@@ -535,8 +535,8 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: NONE,
 		Ticks:    []uint8{4},
 		Operation: func(c *CPU) uint8 {
-			c.SetDecRegFlags(c.Registers.C)
-			c.Registers.C--
+			c.SetDecRegFlags(c.registers.C)
+			c.registers.C--
 			return 0
 		},
 	},
@@ -546,7 +546,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.C = uint8(c.Fetched)
+			c.registers.C = uint8(c.fetched)
 			return 0
 		},
 	},
@@ -556,13 +556,13 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
+			a := c.registers.A
 			c.SetRotateFlags(a, "R")
 			// a = 11101001
 			// a >> 1 = 01110100
 			// a << 7 = 10000000
 			//          11110100
-			c.Registers.A = (a >> 1) | (a << 7)
+			c.registers.A = (a >> 1) | (a << 7)
 			return 0
 		},
 	},
@@ -582,7 +582,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: R_N16,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetDE(c.Fetched)
+			c.registers.SetDE(c.fetched)
 			return 0
 		},
 	},
@@ -592,7 +592,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetDE(), c.Registers.A)
+			c.bus.Write(c.registers.GetDE(), c.registers.A)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -603,7 +603,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetDE(c.Registers.GetDE() + 1)
+			c.registers.SetDE(c.registers.GetDE() + 1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -614,8 +614,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetIncRegFlags(c.Registers.D)
-			c.Registers.D++
+			c.SetIncRegFlags(c.registers.D)
+			c.registers.D++
 			return 0
 		},
 	},
@@ -625,8 +625,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetDecRegFlags(c.Registers.D)
-			c.Registers.D--
+			c.SetDecRegFlags(c.registers.D)
+			c.registers.D--
 			return 0
 		},
 	},
@@ -636,7 +636,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.D = uint8(c.Fetched)
+			c.registers.D = uint8(c.fetched)
 			return 0
 		},
 	},
@@ -646,9 +646,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
+			a := c.registers.A
 			var oldCarry uint8
-			if c.Registers.GetFlag(CARRY_FLAG) {
+			if c.registers.GetFlag(CARRY_FLAG) {
 				oldCarry = 1
 			}
 			c.SetRotateFlags(a, "L")
@@ -656,7 +656,7 @@ var Instructions = [0x0100]Instruction{
 			// a = 10010100
 			// a << 1 = 00101000
 			// a | 00000001 = 00101001
-			c.Registers.A = (a << 1) | oldCarry
+			c.registers.A = (a << 1) | oldCarry
 			return 0
 		},
 	},
@@ -666,7 +666,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: E8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.PC += uint16(c.RelAddr)
+			c.registers.PC += uint16(c.relAddr)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -677,8 +677,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetAddFlags16(c.Registers.GetHL(), c.Registers.GetDE())
-			c.Registers.SetHL(c.Registers.GetHL() + c.Registers.GetDE())
+			c.SetAddFlags16(c.registers.GetHL(), c.registers.GetDE())
+			c.registers.SetHL(c.registers.GetHL() + c.registers.GetDE())
 			c.cpuCycles(1)
 			return 0
 		},
@@ -689,9 +689,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			fetched := c.Read(c.Registers.GetDE())
+			fetched := c.bus.Read(c.registers.GetDE())
 			c.cpuCycles(1)
-			c.Registers.A = fetched
+			c.registers.A = fetched
 			return 0
 		},
 	},
@@ -701,7 +701,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetDE(c.Registers.GetDE() - 1)
+			c.registers.SetDE(c.registers.GetDE() - 1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -712,8 +712,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetIncRegFlags(c.Registers.E)
-			c.Registers.E++
+			c.SetIncRegFlags(c.registers.E)
+			c.registers.E++
 			return 0
 		},
 	},
@@ -723,8 +723,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetDecRegFlags(c.Registers.E)
-			c.Registers.E--
+			c.SetDecRegFlags(c.registers.E)
+			c.registers.E--
 			return 0
 		},
 	},
@@ -734,7 +734,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.E = uint8(c.Fetched)
+			c.registers.E = uint8(c.fetched)
 			return 0
 		},
 	},
@@ -744,9 +744,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
+			a := c.registers.A
 			var oldCarry uint8
-			if c.Registers.GetFlag(CARRY_FLAG) {
+			if c.registers.GetFlag(CARRY_FLAG) {
 				oldCarry = 1
 			}
 			c.SetRotateFlags(a, "R")
@@ -755,7 +755,7 @@ var Instructions = [0x0100]Instruction{
 			// a >> 1 = 01001010
 			// oldCarry << 7 = 10000000
 			// a | 10000000 = 11001010
-			c.Registers.A = (a >> 1) | (oldCarry << 7)
+			c.registers.A = (a >> 1) | (oldCarry << 7)
 			return 0
 		},
 	},
@@ -765,8 +765,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12, 8},
 		AddrMode: E8,
 		Operation: func(c *CPU) uint8 {
-			if !c.Registers.GetFlag(ZERO_FLAG) {
-				c.Registers.PC += uint16(c.RelAddr)
+			if !c.registers.GetFlag(ZERO_FLAG) {
+				c.registers.PC += uint16(c.relAddr)
 				c.cpuCycles(1)
 				return 0
 			}
@@ -779,7 +779,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetHL(c.Fetched)
+			c.registers.SetHL(c.fetched)
 			return 0
 		},
 	},
@@ -789,9 +789,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			hl := c.Registers.GetHL()
-			c.Write(hl, c.Registers.A)
-			c.Registers.SetHL(hl + 1)
+			hl := c.registers.GetHL()
+			c.bus.Write(hl, c.registers.A)
+			c.registers.SetHL(hl + 1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -802,7 +802,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetHL(c.Registers.GetHL() + 1)
+			c.registers.SetHL(c.registers.GetHL() + 1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -813,8 +813,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetIncRegFlags(c.Registers.H)
-			c.Registers.H++
+			c.SetIncRegFlags(c.registers.H)
+			c.registers.H++
 			return 0
 		},
 	},
@@ -824,8 +824,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetDecRegFlags(c.Registers.H)
-			c.Registers.H--
+			c.SetDecRegFlags(c.registers.H)
+			c.registers.H--
 			return 0
 		},
 	},
@@ -835,7 +835,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.H = uint8(c.Fetched)
+			c.registers.H = uint8(c.fetched)
 			return 0
 		},
 	},
@@ -847,27 +847,27 @@ var Instructions = [0x0100]Instruction{
 	// 	Operation: func(c *CPU) {
 	// 		var adj uint8 = 0
 	// 		carryFlag := false
-	// 		if c.Registers.GetFlag(registers.SUBTRACTION_FLAG) {
-	// 			if c.Registers.GetFlag(registers.HALF_CARRY_FLAG) {
+	// 		if c.registers.GetFlag(registers.SUBTRACTION_FLAG) {
+	// 			if c.registers.GetFlag(registers.HALF_CARRY_FLAG) {
 	// 				adj += 0x0006
 	// 			}
-	// 			if c.Registers.GetFlag(registers.CARRY_FLAG) {
+	// 			if c.registers.GetFlag(registers.CARRY_FLAG) {
 	// 				adj += 0x0060
 	// 			}
-	// 			c.Registers.SetReg(registers.A, c.Registers.GetReg(registers.A)-adj)
+	// 			c.registers.SetReg(registers.A, c.registers.GetReg(registers.A)-adj)
 	// 		} else {
-	// 			if c.Registers.GetFlag(registers.HALF_CARRY_FLAG) || c.Registers.GetReg(registers.A)&0x000F > 0x0009 {
+	// 			if c.registers.GetFlag(registers.HALF_CARRY_FLAG) || c.registers.GetReg(registers.A)&0x000F > 0x0009 {
 	// 				adj += 0x0006
 	// 			}
-	// 			if c.Registers.GetFlag(registers.CARRY_FLAG) || c.Registers.GetReg(registers.A) > 0x0099 {
+	// 			if c.registers.GetFlag(registers.CARRY_FLAG) || c.registers.GetReg(registers.A) > 0x0099 {
 	// 				carryFlag = true
 	// 				adj += 0x0060
 	// 			}
-	// 			c.Registers.SetReg(registers.A, c.Registers.GetReg(registers.A)+adj)
+	// 			c.registers.SetReg(registers.A, c.registers.GetReg(registers.A)+adj)
 	// 		}
-	// 		c.Registers.SetFlag(registers.HALF_CARRY_FLAG, false)
-	// 		c.Registers.SetFlag(registers.ZERO_FLAG, c.Registers.GetReg(registers.A) == 0)
-	// 		c.Registers.SetFlag(registers.CARRY_FLAG, carryFlag)
+	// 		c.registers.SetFlag(registers.HALF_CARRY_FLAG, false)
+	// 		c.registers.SetFlag(registers.ZERO_FLAG, c.registers.GetReg(registers.A) == 0)
+	// 		c.registers.SetFlag(registers.CARRY_FLAG, carryFlag)
 	// 	},
 	// },
 	0x28: {
@@ -876,8 +876,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12, 8},
 		AddrMode: E8,
 		Operation: func(c *CPU) uint8 {
-			if c.Registers.GetFlag(ZERO_FLAG) {
-				c.Registers.PC += uint16(c.RelAddr)
+			if c.registers.GetFlag(ZERO_FLAG) {
+				c.registers.PC += uint16(c.relAddr)
 				c.cpuCycles(1)
 				return 0
 			}
@@ -890,9 +890,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			hl := c.Registers.GetHL()
+			hl := c.registers.GetHL()
 			c.SetAddFlags16(hl, hl)
-			c.Registers.SetHL(hl + hl)
+			c.registers.SetHL(hl + hl)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -903,10 +903,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			fetched := c.Read(c.Registers.GetHL())
+			fetched := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.A = fetched
-			c.Registers.SetHL(c.Registers.GetHL() + 1)
+			c.registers.A = fetched
+			c.registers.SetHL(c.registers.GetHL() + 1)
 			return 0
 		},
 	},
@@ -916,7 +916,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetDE(c.Registers.GetDE() - 1)
+			c.registers.SetDE(c.registers.GetDE() - 1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -927,8 +927,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetIncRegFlags(c.Registers.L)
-			c.Registers.L++
+			c.SetIncRegFlags(c.registers.L)
+			c.registers.L++
 			return 0
 		},
 	},
@@ -938,8 +938,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetDecRegFlags(c.Registers.L)
-			c.Registers.L--
+			c.SetDecRegFlags(c.registers.L)
+			c.registers.L--
 			return 0
 		},
 	},
@@ -949,7 +949,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.L = uint8(c.Fetched)
+			c.registers.L = uint8(c.fetched)
 			return 0
 		},
 	},
@@ -959,9 +959,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{4},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.Registers.SetReg(registers.A, ^c.Registers.GetReg(registers.A))
-	// 		c.Registers.SetFlag(registers.SUBTRACTION_FLAG, true)
-	// 		c.Registers.SetFlag(registers.HALF_CARRY_FLAG, true)
+	// 		c.registers.SetReg(registers.A, ^c.registers.GetReg(registers.A))
+	// 		c.registers.SetFlag(registers.SUBTRACTION_FLAG, true)
+	// 		c.registers.SetFlag(registers.HALF_CARRY_FLAG, true)
 	// 	},
 	// },
 	0x30: {
@@ -970,8 +970,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12, 8},
 		AddrMode: E8,
 		Operation: func(c *CPU) uint8 {
-			if !c.Registers.GetFlag(CARRY_FLAG) {
-				c.Registers.PC += uint16(c.RelAddr)
+			if !c.registers.GetFlag(CARRY_FLAG) {
+				c.registers.PC += uint16(c.relAddr)
 				c.cpuCycles(1)
 				return 0
 			}
@@ -984,7 +984,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: R_N16,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SP = c.Fetched
+			c.registers.SP = c.fetched
 			return 0
 		},
 	},
@@ -994,9 +994,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			hl := c.Registers.GetHL()
-			c.Write(hl, c.Registers.A)
-			c.Registers.SetHL(hl - 1)
+			hl := c.registers.GetHL()
+			c.bus.Write(hl, c.registers.A)
+			c.registers.SetHL(hl - 1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1007,7 +1007,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SP++
+			c.registers.SP++
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1018,10 +1018,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
 			c.SetIncFlags(val)
-			c.Write(c.Registers.GetHL(), val+1)
+			c.bus.Write(c.registers.GetHL(), val+1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1032,10 +1032,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
 			c.SetDecFlags(val)
-			c.Write(c.Registers.GetHL(), val-1)
+			c.bus.Write(c.registers.GetHL(), val-1)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1046,7 +1046,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetHL(), uint8(c.Fetched))
+			c.bus.Write(c.registers.GetHL(), uint8(c.fetched))
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1057,9 +1057,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-			c.Registers.SetFlag(HALF_CARRY_FLAG, false)
-			c.Registers.SetFlag(CARRY_FLAG, true)
+			c.registers.SetFlag(SUBTRACTION_FLAG, false)
+			c.registers.SetFlag(HALF_CARRY_FLAG, false)
+			c.registers.SetFlag(CARRY_FLAG, true)
 			return 0
 		},
 	},
@@ -1069,8 +1069,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12, 8},
 		AddrMode: E8,
 		Operation: func(c *CPU) uint8 {
-			if c.Registers.GetFlag(CARRY_FLAG) {
-				c.Registers.PC += uint16(c.RelAddr)
+			if c.registers.GetFlag(CARRY_FLAG) {
+				c.registers.PC += uint16(c.relAddr)
 				c.cpuCycles(1)
 				return 0
 			}
@@ -1083,9 +1083,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			hl := c.Registers.GetHL()
-			c.SetAddFlags16(hl, c.Registers.SP)
-			c.Registers.SetHL(hl + c.Registers.SP)
+			hl := c.registers.GetHL()
+			c.SetAddFlags16(hl, c.registers.SP)
+			c.registers.SetHL(hl + c.registers.SP)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1096,10 +1096,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			fetched := c.Read(c.Registers.GetHL())
+			fetched := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.A = fetched
-			c.Registers.SetHL(c.Registers.GetHL() - 1)
+			c.registers.A = fetched
+			c.registers.SetHL(c.registers.GetHL() - 1)
 			return 0
 		},
 	},
@@ -1109,7 +1109,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SP--
+			c.registers.SP--
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1120,8 +1120,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetIncRegFlags(c.Registers.A)
-			c.Registers.A++
+			c.SetIncRegFlags(c.registers.A)
+			c.registers.A++
 			return 0
 		},
 	},
@@ -1131,8 +1131,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.SetDecRegFlags(c.Registers.A)
-			c.Registers.A--
+			c.SetDecRegFlags(c.registers.A)
+			c.registers.A--
 			return 0
 		},
 	},
@@ -1142,7 +1142,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = uint8(c.Fetched)
+			c.registers.A = uint8(c.fetched)
 			return 0
 		},
 	},
@@ -1152,10 +1152,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetFlag(SUBTRACTION_FLAG, false)
-			c.Registers.SetFlag(HALF_CARRY_FLAG, false)
-			og := c.Registers.GetFlag(CARRY_FLAG)
-			c.Registers.SetFlag(CARRY_FLAG, !og)
+			c.registers.SetFlag(SUBTRACTION_FLAG, false)
+			c.registers.SetFlag(HALF_CARRY_FLAG, false)
+			og := c.registers.GetFlag(CARRY_FLAG)
+			c.registers.SetFlag(CARRY_FLAG, !og)
 			return 0
 		},
 	},
@@ -1174,7 +1174,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.B = c.Registers.C
+			c.registers.B = c.registers.C
 			return 0
 		},
 	},
@@ -1184,7 +1184,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.B = c.Registers.D
+			c.registers.B = c.registers.D
 			return 0
 		},
 	},
@@ -1194,7 +1194,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.B = c.Registers.E
+			c.registers.B = c.registers.E
 			return 0
 		},
 	},
@@ -1204,7 +1204,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.B = c.Registers.H
+			c.registers.B = c.registers.H
 			return 0
 		},
 	},
@@ -1214,7 +1214,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.B = c.Registers.L
+			c.registers.B = c.registers.L
 			return 0
 		},
 	},
@@ -1224,9 +1224,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.B = val
+			c.registers.B = val
 			return 0
 		},
 	},
@@ -1236,7 +1236,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.B = c.Registers.A
+			c.registers.B = c.registers.A
 			return 0
 		},
 	},
@@ -1246,7 +1246,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.C = c.Registers.B
+			c.registers.C = c.registers.B
 			return 0
 		},
 	},
@@ -1265,7 +1265,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.C = c.Registers.D
+			c.registers.C = c.registers.D
 			return 0
 		},
 	},
@@ -1275,7 +1275,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.C = c.Registers.E
+			c.registers.C = c.registers.E
 			return 0
 		},
 	},
@@ -1285,7 +1285,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.C = c.Registers.H
+			c.registers.C = c.registers.H
 			return 0
 		},
 	},
@@ -1295,7 +1295,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.C = c.Registers.L
+			c.registers.C = c.registers.L
 			return 0
 		},
 	},
@@ -1305,9 +1305,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.C = val
+			c.registers.C = val
 			return 0
 		},
 	},
@@ -1317,7 +1317,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.C = c.Registers.A
+			c.registers.C = c.registers.A
 			return 0
 		},
 	},
@@ -1327,7 +1327,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.D = c.Registers.B
+			c.registers.D = c.registers.B
 			return 0
 		},
 	},
@@ -1337,7 +1337,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.D = c.Registers.C
+			c.registers.D = c.registers.C
 			return 0
 		},
 	},
@@ -1356,7 +1356,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.D = c.Registers.E
+			c.registers.D = c.registers.E
 			return 0
 		},
 	},
@@ -1366,7 +1366,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.D = c.Registers.H
+			c.registers.D = c.registers.H
 			return 0
 		},
 	},
@@ -1376,7 +1376,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.D = c.Registers.L
+			c.registers.D = c.registers.L
 			return 0
 		},
 	},
@@ -1386,9 +1386,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.D = val
+			c.registers.D = val
 			return 0
 		},
 	},
@@ -1398,7 +1398,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.D = c.Registers.A
+			c.registers.D = c.registers.A
 			return 0
 		},
 	},
@@ -1408,7 +1408,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.E = c.Registers.B
+			c.registers.E = c.registers.B
 			return 0
 		},
 	},
@@ -1418,7 +1418,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.E = c.Registers.C
+			c.registers.E = c.registers.C
 			return 0
 		},
 	},
@@ -1428,7 +1428,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.E = c.Registers.D
+			c.registers.E = c.registers.D
 			return 0
 		},
 	},
@@ -1447,7 +1447,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.E = c.Registers.H
+			c.registers.E = c.registers.H
 			return 0
 		},
 	},
@@ -1457,7 +1457,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.E = c.Registers.L
+			c.registers.E = c.registers.L
 			return 0
 		},
 	},
@@ -1467,9 +1467,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.E = val
+			c.registers.E = val
 			return 0
 		},
 	},
@@ -1479,7 +1479,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.E = c.Registers.A
+			c.registers.E = c.registers.A
 			return 0
 		},
 	},
@@ -1489,7 +1489,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.H = c.Registers.B
+			c.registers.H = c.registers.B
 			return 0
 		},
 	},
@@ -1499,7 +1499,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.H = c.Registers.C
+			c.registers.H = c.registers.C
 			return 0
 		},
 	},
@@ -1509,7 +1509,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.H = c.Registers.D
+			c.registers.H = c.registers.D
 			return 0
 		},
 	},
@@ -1519,7 +1519,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.H = c.Registers.E
+			c.registers.H = c.registers.E
 			return 0
 		},
 	},
@@ -1538,7 +1538,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.H = c.Registers.L
+			c.registers.H = c.registers.L
 			return 0
 		},
 	},
@@ -1548,9 +1548,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.H = val
+			c.registers.H = val
 			return 0
 		},
 	},
@@ -1560,7 +1560,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.H = c.Registers.A
+			c.registers.H = c.registers.A
 			return 0
 		},
 	},
@@ -1570,7 +1570,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.L = c.Registers.B
+			c.registers.L = c.registers.B
 			return 0
 		},
 	},
@@ -1580,7 +1580,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.L = c.Registers.C
+			c.registers.L = c.registers.C
 			return 0
 		},
 	},
@@ -1590,7 +1590,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.L = c.Registers.D
+			c.registers.L = c.registers.D
 			return 0
 		},
 	},
@@ -1600,7 +1600,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.L = c.Registers.E
+			c.registers.L = c.registers.E
 			return 0
 		},
 	},
@@ -1610,7 +1610,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.L = c.Registers.H
+			c.registers.L = c.registers.H
 			return 0
 		},
 	},
@@ -1629,9 +1629,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.L = val
+			c.registers.L = val
 			return 0
 		},
 	},
@@ -1641,7 +1641,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.L = c.Registers.A
+			c.registers.L = c.registers.A
 			return 0
 		},
 	},
@@ -1651,7 +1651,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetHL(), c.Registers.B)
+			c.bus.Write(c.registers.GetHL(), c.registers.B)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1662,7 +1662,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetHL(), c.Registers.C)
+			c.bus.Write(c.registers.GetHL(), c.registers.C)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1673,7 +1673,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetHL(), c.Registers.D)
+			c.bus.Write(c.registers.GetHL(), c.registers.D)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1684,7 +1684,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetHL(), c.Registers.E)
+			c.bus.Write(c.registers.GetHL(), c.registers.E)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1695,7 +1695,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetHL(), c.Registers.H)
+			c.bus.Write(c.registers.GetHL(), c.registers.H)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1706,7 +1706,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetHL(), c.Registers.L)
+			c.bus.Write(c.registers.GetHL(), c.registers.L)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1717,7 +1717,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Halted = true
+			c.halted = true
 			return 0
 		},
 	},
@@ -1727,7 +1727,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Registers.GetHL(), c.Registers.A)
+			c.bus.Write(c.registers.GetHL(), c.registers.A)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -1738,7 +1738,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Registers.B
+			c.registers.A = c.registers.B
 			return 0
 		},
 	},
@@ -1748,7 +1748,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Registers.C
+			c.registers.A = c.registers.C
 			return 0
 		},
 	},
@@ -1758,7 +1758,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Registers.D
+			c.registers.A = c.registers.D
 			return 0
 		},
 	},
@@ -1768,7 +1768,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Registers.E
+			c.registers.A = c.registers.E
 			return 0
 		},
 	},
@@ -1778,7 +1778,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Registers.H
+			c.registers.A = c.registers.H
 			return 0
 		},
 	},
@@ -1788,7 +1788,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Registers.L
+			c.registers.A = c.registers.L
 			return 0
 		},
 	},
@@ -1798,9 +1798,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.A = val
+			c.registers.A = val
 			return 0
 		},
 	},
@@ -1819,9 +1819,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetAddFlags(a, c.Registers.B)
-			c.Registers.A += c.Registers.B
+			a := c.registers.A
+			c.SetAddFlags(a, c.registers.B)
+			c.registers.A += c.registers.B
 			return 0
 		},
 	},
@@ -1831,9 +1831,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetAddFlags(a, c.Registers.C)
-			c.Registers.A += c.Registers.C
+			a := c.registers.A
+			c.SetAddFlags(a, c.registers.C)
+			c.registers.A += c.registers.C
 			return 0
 		},
 	},
@@ -1843,9 +1843,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetAddFlags(a, c.Registers.D)
-			c.Registers.A += c.Registers.D
+			a := c.registers.A
+			c.SetAddFlags(a, c.registers.D)
+			c.registers.A += c.registers.D
 			return 0
 		},
 	},
@@ -1855,9 +1855,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetAddFlags(a, c.Registers.E)
-			c.Registers.A += c.Registers.E
+			a := c.registers.A
+			c.SetAddFlags(a, c.registers.E)
+			c.registers.A += c.registers.E
 			return 0
 		},
 	},
@@ -1867,9 +1867,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetAddFlags(a, c.Registers.H)
-			c.Registers.A += c.Registers.H
+			a := c.registers.A
+			c.SetAddFlags(a, c.registers.H)
+			c.registers.A += c.registers.H
 			return 0
 		},
 	},
@@ -1879,9 +1879,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetAddFlags(a, c.Registers.L)
-			c.Registers.A += c.Registers.L
+			a := c.registers.A
+			c.SetAddFlags(a, c.registers.L)
+			c.registers.A += c.registers.L
 			return 0
 		},
 	},
@@ -1891,9 +1891,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
-			c.SetAddFlags(c.Registers.A, val)
-			c.Registers.A += val
+			val := c.bus.Read(c.registers.GetHL())
+			c.SetAddFlags(c.registers.A, val)
+			c.registers.A += val
 			return 0
 		},
 	},
@@ -1903,9 +1903,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
+			a := c.registers.A
 			c.SetAddFlags(a, a)
-			c.Registers.A += a
+			c.registers.A += a
 			return 0
 		},
 	},
@@ -1915,9 +1915,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetAdcFlags(a, c.Registers.B)
-			c.Registers.A += (c.Registers.B) + carryFlag
+			a := c.registers.A
+			carryFlag := c.SetAdcFlags(a, c.registers.B)
+			c.registers.A += (c.registers.B) + carryFlag
 			return 0
 		},
 	},
@@ -1927,9 +1927,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetAdcFlags(a, c.Registers.C)
-			c.Registers.A += (c.Registers.C) + carryFlag
+			a := c.registers.A
+			carryFlag := c.SetAdcFlags(a, c.registers.C)
+			c.registers.A += (c.registers.C) + carryFlag
 			return 0
 		},
 	},
@@ -1939,9 +1939,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetAdcFlags(a, c.Registers.D)
-			c.Registers.A += (c.Registers.D) + carryFlag
+			a := c.registers.A
+			carryFlag := c.SetAdcFlags(a, c.registers.D)
+			c.registers.A += (c.registers.D) + carryFlag
 			return 0
 		},
 	},
@@ -1951,9 +1951,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetAdcFlags(a, c.Registers.E)
-			c.Registers.A += (c.Registers.E) + carryFlag
+			a := c.registers.A
+			carryFlag := c.SetAdcFlags(a, c.registers.E)
+			c.registers.A += (c.registers.E) + carryFlag
 			return 0
 		},
 	},
@@ -1963,9 +1963,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetAdcFlags(a, c.Registers.H)
-			c.Registers.A += (c.Registers.H) + carryFlag
+			a := c.registers.A
+			carryFlag := c.SetAdcFlags(a, c.registers.H)
+			c.registers.A += (c.registers.H) + carryFlag
 			return 0
 		},
 	},
@@ -1975,9 +1975,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetAdcFlags(a, c.Registers.L)
-			c.Registers.A += (c.Registers.L) + carryFlag
+			a := c.registers.A
+			carryFlag := c.SetAdcFlags(a, c.registers.L)
+			c.registers.A += (c.registers.L) + carryFlag
 			return 0
 		},
 	},
@@ -1987,10 +1987,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			carryFlag := c.SetAdcFlags(c.Registers.A, val)
-			c.Registers.A += (val + carryFlag)
+			carryFlag := c.SetAdcFlags(c.registers.A, val)
+			c.registers.A += (val + carryFlag)
 			return 0
 		},
 	},
@@ -2000,9 +2000,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
+			a := c.registers.A
 			carryFlag := c.SetAdcFlags(a, a)
-			c.Registers.A += (a + carryFlag)
+			c.registers.A += (a + carryFlag)
 			return 0
 		},
 	},
@@ -2012,9 +2012,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetSubFlags(a, c.Registers.B)
-			c.Registers.A -= c.Registers.B
+			a := c.registers.A
+			c.SetSubFlags(a, c.registers.B)
+			c.registers.A -= c.registers.B
 			return 0
 		},
 	},
@@ -2024,9 +2024,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetSubFlags(a, c.Registers.C)
-			c.Registers.A -= c.Registers.C
+			a := c.registers.A
+			c.SetSubFlags(a, c.registers.C)
+			c.registers.A -= c.registers.C
 			return 0
 		},
 	},
@@ -2036,9 +2036,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetSubFlags(a, c.Registers.D)
-			c.Registers.A -= c.Registers.D
+			a := c.registers.A
+			c.SetSubFlags(a, c.registers.D)
+			c.registers.A -= c.registers.D
 			return 0
 		},
 	},
@@ -2048,9 +2048,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetSubFlags(a, c.Registers.E)
-			c.Registers.A -= c.Registers.E
+			a := c.registers.A
+			c.SetSubFlags(a, c.registers.E)
+			c.registers.A -= c.registers.E
 			return 0
 		},
 	},
@@ -2060,9 +2060,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetSubFlags(a, c.Registers.H)
-			c.Registers.A -= c.Registers.H
+			a := c.registers.A
+			c.SetSubFlags(a, c.registers.H)
+			c.registers.A -= c.registers.H
 			return 0
 		},
 	},
@@ -2072,9 +2072,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetSubFlags(a, c.Registers.L)
-			c.Registers.A -= c.Registers.L
+			a := c.registers.A
+			c.SetSubFlags(a, c.registers.L)
+			c.registers.A -= c.registers.L
 			return 0
 		},
 	},
@@ -2084,11 +2084,11 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			a := c.Registers.A
+			a := c.registers.A
 			c.SetSubFlags(a, val)
-			c.Registers.A -= a - val
+			c.registers.A -= a - val
 			return 0
 		},
 	},
@@ -2098,11 +2098,11 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.SetFlag(ZERO_FLAG, true)
-			c.Registers.SetFlag(SUBTRACTION_FLAG, true)
-			c.Registers.SetFlag(HALF_CARRY_FLAG, false)
-			c.Registers.SetFlag(CARRY_FLAG, false)
-			c.Registers.A = 0
+			c.registers.SetFlag(ZERO_FLAG, true)
+			c.registers.SetFlag(SUBTRACTION_FLAG, true)
+			c.registers.SetFlag(HALF_CARRY_FLAG, false)
+			c.registers.SetFlag(CARRY_FLAG, false)
+			c.registers.A = 0
 			return 0
 		},
 	},
@@ -2112,9 +2112,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetSbcFlags(a, c.Registers.B)
-			c.Registers.A -= c.Registers.B - carryFlag
+			a := c.registers.A
+			carryFlag := c.SetSbcFlags(a, c.registers.B)
+			c.registers.A -= c.registers.B - carryFlag
 			return 0
 		},
 	},
@@ -2124,9 +2124,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetSbcFlags(a, c.Registers.C)
-			c.Registers.A -= c.Registers.C - carryFlag
+			a := c.registers.A
+			carryFlag := c.SetSbcFlags(a, c.registers.C)
+			c.registers.A -= c.registers.C - carryFlag
 			return 0
 		},
 	},
@@ -2136,9 +2136,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetSbcFlags(a, c.Registers.D)
-			c.Registers.A -= c.Registers.D - carryFlag
+			a := c.registers.A
+			carryFlag := c.SetSbcFlags(a, c.registers.D)
+			c.registers.A -= c.registers.D - carryFlag
 			return 0
 		},
 	},
@@ -2148,9 +2148,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetSbcFlags(a, c.Registers.E)
-			c.Registers.A -= c.Registers.E - carryFlag
+			a := c.registers.A
+			carryFlag := c.SetSbcFlags(a, c.registers.E)
+			c.registers.A -= c.registers.E - carryFlag
 			return 0
 		},
 	},
@@ -2160,9 +2160,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetSbcFlags(a, c.Registers.H)
-			c.Registers.A -= c.Registers.H - carryFlag
+			a := c.registers.A
+			carryFlag := c.SetSbcFlags(a, c.registers.H)
+			c.registers.A -= c.registers.H - carryFlag
 			return 0
 		},
 	},
@@ -2172,9 +2172,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetSbcFlags(a, c.Registers.L)
-			c.Registers.A -= c.Registers.L - carryFlag
+			a := c.registers.A
+			carryFlag := c.SetSbcFlags(a, c.registers.L)
+			c.registers.A -= c.registers.L - carryFlag
 			return 0
 		},
 	},
@@ -2184,11 +2184,11 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			a := c.Registers.A
+			a := c.registers.A
 			carryFlag := c.SetSbcFlags(a, val)
-			c.Registers.A -= (val + carryFlag)
+			c.registers.A -= (val + carryFlag)
 			return 0
 		},
 	},
@@ -2198,12 +2198,12 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			oldCarryFlag := c.Registers.GetFlag(CARRY_FLAG)
+			a := c.registers.A
+			oldCarryFlag := c.registers.GetFlag(CARRY_FLAG)
 			carryFlag := c.SetSbcFlags(a, a)
-			c.Registers.A -= (a - carryFlag)
+			c.registers.A -= (a - carryFlag)
 			// set carryFlag back to original value as it should not be affected by this opcode
-			c.Registers.SetFlag(SUBTRACTION_FLAG, oldCarryFlag)
+			c.registers.SetFlag(SUBTRACTION_FLAG, oldCarryFlag)
 			return 0
 		},
 	},
@@ -2213,8 +2213,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A &= c.Registers.B
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= c.registers.B
+			c.SetAndFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2224,8 +2224,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A &= c.Registers.C
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= c.registers.C
+			c.SetAndFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2235,8 +2235,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A &= c.Registers.D
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= c.registers.D
+			c.SetAndFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2246,8 +2246,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A &= c.Registers.E
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= c.registers.E
+			c.SetAndFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2257,8 +2257,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A &= c.Registers.H
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= c.registers.H
+			c.SetAndFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2268,8 +2268,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A &= c.Registers.L
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= c.registers.L
+			c.SetAndFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2279,10 +2279,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.A &= val
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= val
+			c.SetAndFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2292,8 +2292,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A &= c.Registers.A
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= c.registers.A
+			c.SetAndFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2303,8 +2303,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A ^= c.Registers.B
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A ^= c.registers.B
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2314,8 +2314,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A ^= c.Registers.C
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A ^= c.registers.C
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2325,8 +2325,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A ^= c.Registers.D
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A ^= c.registers.D
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2336,8 +2336,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A ^= c.Registers.E
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A ^= c.registers.E
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2347,8 +2347,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A ^= c.Registers.H
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A ^= c.registers.H
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2358,8 +2358,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A ^= c.Registers.L
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A ^= c.registers.L
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2369,10 +2369,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.A ^= val
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A ^= val
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2381,8 +2381,8 @@ var Instructions = [0x0100]Instruction{
 		Size:     1,
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A^= c.Registers.A
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A^= c.registers.A
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2392,8 +2392,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A|= c.Registers.B
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A|= c.registers.B
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2403,8 +2403,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A |= c.Registers.C
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A |= c.registers.C
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2414,8 +2414,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A|= c.Registers.D
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A|= c.registers.D
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2425,8 +2425,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A|= c.Registers.E
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A|= c.registers.E
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2436,8 +2436,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A|= c.Registers.H
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A|= c.registers.H
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2447,8 +2447,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A|= c.Registers.L
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A|= c.registers.L
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2458,10 +2458,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			val := c.Read(c.Registers.GetHL())
+			val := c.bus.Read(c.registers.GetHL())
 			c.cpuCycles(1)
-			c.Registers.A |= val
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A |= val
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2471,8 +2471,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A |= c.Registers.A
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A |= c.registers.A
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -2482,7 +2482,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{4},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.SetCpFlags(c.Registers.GetReg(registers.A), c.Registers.GetReg(registers.B))
+	// 		c.SetCpFlags(c.registers.GetReg(registers.A), c.registers.GetReg(registers.B))
 	// 	},
 	// },
 	// 0xB9: {
@@ -2491,7 +2491,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{4},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.SetCpFlags(c.Registers.GetReg(registers.A), c.Registers.GetReg(registers.C))
+	// 		c.SetCpFlags(c.registers.GetReg(registers.A), c.registers.GetReg(registers.C))
 	// 	},
 	// },
 	// 0xBA: {
@@ -2500,7 +2500,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{4},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.SetCpFlags(c.Registers.GetReg(registers.A), c.Registers.GetReg(registers.D))
+	// 		c.SetCpFlags(c.registers.GetReg(registers.A), c.registers.GetReg(registers.D))
 	// 	},
 	// },
 	// 0xBB: {
@@ -2509,7 +2509,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{4},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.SetCpFlags(c.Registers.GetReg(registers.A), c.Registers.GetReg(registers.E))
+	// 		c.SetCpFlags(c.registers.GetReg(registers.A), c.registers.GetReg(registers.E))
 	// 	},
 	// },
 	// 0xBC: {
@@ -2518,7 +2518,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{4},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.SetCpFlags(c.Registers.GetReg(registers.A), c.Registers.GetReg(registers.H))
+	// 		c.SetCpFlags(c.registers.GetReg(registers.A), c.registers.GetReg(registers.H))
 	// 	},
 	// },
 	// 0xBD: {
@@ -2527,7 +2527,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{4},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.SetCpFlags(c.Registers.GetReg(registers.A), c.Registers.GetReg(registers.L))
+	// 		c.SetCpFlags(c.registers.GetReg(registers.A), c.registers.GetReg(registers.L))
 	// 	},
 	// },
 	// 0xBE: {
@@ -2536,9 +2536,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{8},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		val := c.Read(c.Registers.GetHL())
+	// 		val := c.bus.Read(c.registers.GetHL())
 	// 		c.cpuCycles(1)
-	// 		c.SetCpFlags(c.Registers.GetReg(registers.A), val)
+	// 		c.SetCpFlags(c.registers.GetReg(registers.A), val)
 	// 	},
 	// },
 	// 0xBF: {
@@ -2547,7 +2547,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{4},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.SetCpFlags(c.Registers.GetReg(registers.A), c.Registers.GetReg(registers.A))
+	// 		c.SetCpFlags(c.registers.GetReg(registers.A), c.registers.GetReg(registers.A))
 	// 	},
 	// },
 	// 0xC0: {
@@ -2556,9 +2556,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{20, 8},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		if !c.Registers.GetFlag(registers.ZERO_FLAG) {
+	// 		if !c.registers.GetFlag(registers.ZERO_FLAG) {
 	// 			val := c.StackPop16()
-	// 			c.Registers.SetPC(val)
+	// 			c.registers.SetPC(val)
 	// 			c.cpuCycles(1)
 	// 		}
 	// 		c.cpuCycles(1)
@@ -2571,7 +2571,7 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
 			val := c.StackPop16()
-			c.Registers.SetBC(val)
+			c.registers.SetBC(val)
 			return 0
 		},
 	},
@@ -2581,8 +2581,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16, 12},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) uint8 {
-			if !c.Registers.GetFlag(ZERO_FLAG) {
-				c.Registers.PC = c.Fetched
+			if !c.registers.GetFlag(ZERO_FLAG) {
+				c.registers.PC = c.fetched
 				c.cpuCycles(1)
 				return 0
 			}
@@ -2595,7 +2595,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.PC = c.Fetched
+			c.registers.PC = c.fetched
 			return 0
 		},
 	},
@@ -2605,9 +2605,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{24, 12},
 		AddrMode: R_A16,
 		Operation: func(c *CPU) uint8 {
-			if !c.Registers.GetFlag(ZERO_FLAG) {
-				c.StackPush16(c.Registers.PC)
-				c.Registers.PC = c.Fetched
+			if !c.registers.GetFlag(ZERO_FLAG) {
+				c.StackPush16(c.registers.PC)
+				c.registers.PC = c.fetched
 				c.cpuCycles(1)
 				return 0
 			}
@@ -2620,7 +2620,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.StackPush16(c.Registers.GetBC())
+			c.StackPush16(c.registers.GetBC())
 			c.cpuCycles(1)
 			return 0
 		},
@@ -2631,9 +2631,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetAddFlags(a, uint8(c.Fetched))
-			c.Registers.A += uint8(c.Fetched)
+			a := c.registers.A
+			c.SetAddFlags(a, uint8(c.fetched))
+			c.registers.A += uint8(c.fetched)
 			return 0
 		},
 	},
@@ -2643,8 +2643,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.StackPush16(c.Registers.GetPC())
-	// 		c.Registers.SetPC(0x0000)
+	// 		c.StackPush16(c.registers.GetPC())
+	// 		c.registers.SetPC(0x0000)
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -2654,9 +2654,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{20, 8},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		if c.Registers.GetFlag(registers.ZERO_FLAG) {
+	// 		if c.registers.GetFlag(registers.ZERO_FLAG) {
 	// 			val := c.StackPop16()
-	// 			c.Registers.SetPC(val)
+	// 			c.registers.SetPC(val)
 	// 			c.cpuCycles(1)
 	// 		}
 	// 		c.cpuCycles(1)
@@ -2669,7 +2669,7 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
 			val := c.StackPop16()
-			c.Registers.PC = val
+			c.registers.PC = val
 			c.cpuCycles(1)
 			return 0
 		},
@@ -2680,8 +2680,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16, 12},
 	// 	AddrMode: R_A16,
 	// 	Operation: func(c *CPU) {
-	// 		if c.Registers.GetFlag(registers.ZERO_FLAG) {
-	// 			c.Registers.SetPC(c.Fetched)
+	// 		if c.registers.GetFlag(registers.ZERO_FLAG) {
+	// 			c.registers.SetPC(c.Fetched)
 	// 			c.cpuCycles(1)
 	// 		}
 	// 		c.cpuCycles(1)
@@ -2694,8 +2694,8 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
 			// 0000000010001101
-			firstNibble := (c.Fetched >> 4) & 0x000F
-			secondNibble := c.Fetched & 0x000F
+			firstNibble := (c.fetched >> 4) & 0x000F
+			secondNibble := c.fetched & 0x000F
 			switch firstNibble {
 			// rlc rrc
 			case 0x0:
@@ -2706,9 +2706,9 @@ var Instructions = [0x0100]Instruction{
 						*reg = c.SetCBRotateFlags(*reg, "L", false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
-						c.Write(c.Registers.GetHL(), c.SetCBRotateFlags(val, "L", false))
+						c.bus.Write(c.registers.GetHL(), c.SetCBRotateFlags(val, "L", false))
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2719,9 +2719,9 @@ var Instructions = [0x0100]Instruction{
 						*reg = c.SetCBRotateFlags(*reg, "R", false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
-						c.Write(c.Registers.GetHL(), c.SetCBRotateFlags(val, "R", false))
+						c.bus.Write(c.registers.GetHL(), c.SetCBRotateFlags(val, "R", false))
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2735,9 +2735,9 @@ var Instructions = [0x0100]Instruction{
 						*reg = c.SetCBRotateFlags(*reg, "L", true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
-						c.Write(c.Registers.GetHL(), c.SetCBRotateFlags(val, "L", true))
+						c.bus.Write(c.registers.GetHL(), c.SetCBRotateFlags(val, "L", true))
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2748,9 +2748,9 @@ var Instructions = [0x0100]Instruction{
 						*reg = c.SetCBRotateFlags(*reg, "R", true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
-						c.Write(c.Registers.GetHL(), c.SetCBRotateFlags(val, "R", true))
+						c.bus.Write(c.registers.GetHL(), c.SetCBRotateFlags(val, "R", true))
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2764,9 +2764,9 @@ var Instructions = [0x0100]Instruction{
 						*reg = c.SetShiftFlags(*reg, "L", false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
-						c.Write(c.Registers.GetHL(), c.SetShiftFlags(val, "L", false))
+						c.bus.Write(c.registers.GetHL(), c.SetShiftFlags(val, "L", false))
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2777,9 +2777,9 @@ var Instructions = [0x0100]Instruction{
 						*reg = c.SetShiftFlags(*reg, "R", false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
-						c.Write(c.Registers.GetHL(), c.SetShiftFlags(val, "R", false))
+						c.bus.Write(c.registers.GetHL(), c.SetShiftFlags(val, "R", false))
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2793,9 +2793,9 @@ var Instructions = [0x0100]Instruction{
 						*reg = c.SetSwapFlags(*reg)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
-						c.Write(c.Registers.GetHL(), c.SetSwapFlags(val))
+						c.bus.Write(c.registers.GetHL(), c.SetSwapFlags(val))
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2806,9 +2806,9 @@ var Instructions = [0x0100]Instruction{
 						*reg = c.SetShiftFlags(*reg, "R", true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
-						c.Write(c.Registers.GetHL(), c.SetShiftFlags(val, "R", true))
+						c.bus.Write(c.registers.GetHL(), c.SetShiftFlags(val, "R", true))
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2822,7 +2822,7 @@ var Instructions = [0x0100]Instruction{
 						c.SetBitFlags(*val, 0)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						c.SetBitFlags(val, 0)
 						return 1
@@ -2834,7 +2834,7 @@ var Instructions = [0x0100]Instruction{
 						c.SetBitFlags(*val, 1)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						c.SetBitFlags(val, 1)
 						return 1
@@ -2849,7 +2849,7 @@ var Instructions = [0x0100]Instruction{
 						c.SetBitFlags(*val, 2)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						c.SetBitFlags(val, 2)
 						return 1
@@ -2861,7 +2861,7 @@ var Instructions = [0x0100]Instruction{
 						c.SetBitFlags(*val, 3)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						c.SetBitFlags(val, 3)
 						return 1
@@ -2876,7 +2876,7 @@ var Instructions = [0x0100]Instruction{
 						c.SetBitFlags(*val, 4)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						c.SetBitFlags(val, 4)
 						return 1
@@ -2888,7 +2888,7 @@ var Instructions = [0x0100]Instruction{
 						c.SetBitFlags(*val, 5)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						c.SetBitFlags(val, 5)
 						return 1
@@ -2903,7 +2903,7 @@ var Instructions = [0x0100]Instruction{
 						c.SetBitFlags(*val, 6)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						c.SetBitFlags(val, 6)
 						return 1
@@ -2915,7 +2915,7 @@ var Instructions = [0x0100]Instruction{
 						c.SetBitFlags(*val, 7)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						c.SetBitFlags(val, 7)
 						return 1
@@ -2930,10 +2930,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 0, false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 0, false)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2944,10 +2944,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 1, false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 1, false)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2961,10 +2961,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 2, false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 2, false)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2975,10 +2975,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 3, false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 3, false)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -2992,10 +2992,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 4, false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 4, false)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3006,10 +3006,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 5, false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 5, false)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3023,10 +3023,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 6, false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 6, false)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3037,10 +3037,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 7, false)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 7, false)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3054,10 +3054,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 0, true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 0, true)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3068,10 +3068,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 1, true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 1, true)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3085,10 +3085,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 2, true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 2, true)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3099,10 +3099,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 3, true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 3, true)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3116,10 +3116,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 4, true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 4, true)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3130,10 +3130,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 5, true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 5, true)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3147,10 +3147,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 6, true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 6, true)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3161,10 +3161,10 @@ var Instructions = [0x0100]Instruction{
 						*val = c.SetBit(*val, 7, true)
 						return 2
 					} else {
-						val := c.Read(c.Registers.GetHL())
+						val := c.bus.Read(c.registers.GetHL())
 						c.cpuCycles(1)
 						val = c.SetBit(val, 7, true)
-						c.Write(c.Registers.GetHL(), val)
+						c.bus.Write(c.registers.GetHL(), val)
 						c.cpuCycles(1)
 						return 0
 					}
@@ -3179,9 +3179,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{24, 12},
 	// 	AddrMode: R_A16,
 	// 	Operation: func(c *CPU) {
-	// 		if c.Registers.GetFlag(registers.ZERO_FLAG) {
-	// 			c.StackPush16(c.Registers.GetPC())
-	// 			c.Registers.SetPC(c.Fetched)
+	// 		if c.registers.GetFlag(registers.ZERO_FLAG) {
+	// 			c.StackPush16(c.registers.GetPC())
+	// 			c.registers.SetPC(c.Fetched)
 	// 			c.cpuCycles(1)
 	// 		}
 	// 	},
@@ -3192,8 +3192,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{24},
 		AddrMode: A16_R,
 		Operation: func(c *CPU) uint8 {
-			c.StackPush16(c.Registers.PC)
-			c.Registers.PC = c.Fetched
+			c.StackPush16(c.registers.PC)
+			c.registers.PC = c.fetched
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3204,9 +3204,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			carryFlag := c.SetAdcFlags(a, uint8(c.Fetched))
-			c.Registers.A += (uint8(c.Fetched) + carryFlag)
+			a := c.registers.A
+			carryFlag := c.SetAdcFlags(a, uint8(c.fetched))
+			c.registers.A += (uint8(c.fetched) + carryFlag)
 			return 0
 		},
 	},
@@ -3216,8 +3216,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.StackPush16(c.Registers.GetPC())
-	// 		c.Registers.SetPC(0x0008)
+	// 		c.StackPush16(c.registers.GetPC())
+	// 		c.registers.SetPC(0x0008)
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -3227,10 +3227,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{20, 8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			if !c.Registers.GetFlag(CARRY_FLAG) {
+			if !c.registers.GetFlag(CARRY_FLAG) {
 				val := c.StackPop16()
 				c.cpuCycles(1)
-				c.Registers.PC = (val)
+				c.registers.PC = (val)
 				c.cpuCycles(1)
 				return 0
 			}
@@ -3245,7 +3245,7 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
 			val := c.StackPop16()
-			c.Registers.SetDE(val)
+			c.registers.SetDE(val)
 			return 0
 		},
 	},
@@ -3255,8 +3255,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16, 12},
 	// 	AddrMode: R_A16,
 	// 	Operation: func(c *CPU) {
-	// 		if !c.Registers.GetFlag(registers.CARRY_FLAG) {
-	// 			c.Registers.SetPC(c.Fetched)
+	// 		if !c.registers.GetFlag(registers.CARRY_FLAG) {
+	// 			c.registers.SetPC(c.Fetched)
 	// 			c.cpuCycles(1)
 	// 		}
 	// 	},
@@ -3268,9 +3268,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{24, 12},
 	// 	AddrMode: R_A16,
 	// 	Operation: func(c *CPU) {
-	// 		if !c.Registers.GetFlag(registers.CARRY_FLAG) {
-	// 			c.StackPush16(c.Registers.GetPC())
-	// 			c.Registers.SetPC(c.Fetched)
+	// 		if !c.registers.GetFlag(registers.CARRY_FLAG) {
+	// 			c.StackPush16(c.registers.GetPC())
+	// 			c.registers.SetPC(c.Fetched)
 	// 			c.cpuCycles(1)
 	// 		}
 	// 	},
@@ -3281,7 +3281,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.StackPush16(c.Registers.GetDE())
+			c.StackPush16(c.registers.GetDE())
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3292,9 +3292,9 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			a := c.Registers.A
-			c.SetSubFlags(a, uint8(c.Fetched))
-			c.Registers.A -= uint8(c.Fetched)
+			a := c.registers.A
+			c.SetSubFlags(a, uint8(c.fetched))
+			c.registers.A -= uint8(c.fetched)
 			return 0
 		},
 	},
@@ -3304,8 +3304,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.StackPush16(c.Registers.GetPC())
-	// 		c.Registers.SetPC(0x0010)
+	// 		c.StackPush16(c.registers.GetPC())
+	// 		c.registers.SetPC(0x0010)
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -3315,10 +3315,10 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{20, 8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			if c.Registers.GetFlag(CARRY_FLAG) {
+			if c.registers.GetFlag(CARRY_FLAG) {
 				val := c.StackPop16()
 				c.cpuCycles(1)
-				c.Registers.PC = val
+				c.registers.PC = val
 				c.cpuCycles(1)
 				return 0
 			}
@@ -3333,9 +3333,9 @@ var Instructions = [0x0100]Instruction{
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
 	// 		val := c.StackPop16()
-	// 		c.Registers.SetPC(val)
+	// 		c.registers.SetPC(val)
 	// 		c.cpuCycles(1)
-	// 		c.Registers.SetIME(true)
+	// 		c.registers.SetIME(true)
 	// 	},
 	// },
 	// 0xDA: {
@@ -3344,8 +3344,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16, 12},
 	// 	AddrMode: R_A16,
 	// 	Operation: func(c *CPU) {
-	// 		if c.Registers.GetFlag(registers.CARRY_FLAG) {
-	// 			c.Registers.SetPC(c.Fetched)
+	// 		if c.registers.GetFlag(registers.CARRY_FLAG) {
+	// 			c.registers.SetPC(c.Fetched)
 	// 			c.cpuCycles(1)
 	// 		}
 	// 		c.cpuCycles(1)
@@ -3358,9 +3358,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{24, 12},
 	// 	AddrMode: R_A16,
 	// 	Operation: func(c *CPU) {
-	// 		if c.Registers.GetFlag(registers.CARRY_FLAG) {
-	// 			c.StackPush16(c.Registers.GetPC())
-	// 			c.Registers.SetPC(c.Fetched)
+	// 		if c.registers.GetFlag(registers.CARRY_FLAG) {
+	// 			c.StackPush16(c.registers.GetPC())
+	// 			c.registers.SetPC(c.Fetched)
 	// 			c.cpuCycles(1)
 	// 		}
 	// 	},
@@ -3372,9 +3372,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{8},
 	// 	AddrMode: R_N8,
 	// 	Operation: func(c *CPU) {
-	// 		a := c.Registers.GetReg(registers.A)
+	// 		a := c.registers.GetReg(registers.A)
 	// 		carryFlag := c.SetSbcFlags(a, uint8(c.Fetched))
-	// 		c.Registers.SetReg(registers.A, a-(uint8(c.Fetched)-carryFlag))
+	// 		c.registers.SetReg(registers.A, a-(uint8(c.Fetched)-carryFlag))
 	// 	},
 	// },
 	// 0xDF: {
@@ -3383,8 +3383,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.StackPush16(c.Registers.GetPC())
-	// 		c.Registers.SetPC(0x0018)
+	// 		c.StackPush16(c.registers.GetPC())
+	// 		c.registers.SetPC(0x0018)
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -3394,7 +3394,7 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: A8_A,
 		Ticks:    []uint8{12},
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Fetched, c.Registers.A)
+			c.bus.Write(c.fetched, c.registers.A)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3406,7 +3406,7 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
 			val := c.StackPop16()
-			c.Registers.SetHL(val)
+			c.registers.SetHL(val)
 			return 0
 		},
 	},
@@ -3416,7 +3416,7 @@ var Instructions = [0x0100]Instruction{
 	// 	AddrMode: NONE,
 	// 	Ticks:    []uint8{8},
 	// 	Operation: func(c *CPU) {
-	// 		c.Write(uint16(c.Registers.GetReg(registers.C))+0xFF00, c.Registers.GetReg(registers.A))
+	// 		c.bus.Write(uint16(c.registers.GetReg(registers.C))+0xFF00, c.registers.GetReg(registers.A))
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -3428,7 +3428,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.StackPush16(c.Registers.GetHL())
+			c.StackPush16(c.registers.GetHL())
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3439,8 +3439,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A &= uint8(c.Fetched)
-			c.SetAndFlags(c.Registers.A)
+			c.registers.A &= uint8(c.fetched)
+			c.SetAndFlags(c.registers.A)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3451,8 +3451,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.StackPush16(c.Registers.PC)
-			c.Registers.PC = 0x0020
+			c.StackPush16(c.registers.PC)
+			c.registers.PC = 0x0020
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3463,11 +3463,11 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: E8,
 		Operation: func(c *CPU) uint8 {
-			sp := c.Registers.SP
-			c.SetAddFlags16(sp, uint16(c.RelAddr))
-			c.Registers.SetFlag(ZERO_FLAG, false)
+			sp := c.registers.SP
+			c.SetAddFlags16(sp, uint16(c.relAddr))
+			c.registers.SetFlag(ZERO_FLAG, false)
 			c.cpuCycles(1)
-			c.Registers.SP = sp + uint16(c.RelAddr)
+			c.registers.SP = sp + uint16(c.relAddr)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3478,7 +3478,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.PC = c.Registers.GetHL()
+			c.registers.PC = c.registers.GetHL()
 			return 0
 		},
 	},
@@ -3488,7 +3488,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: A16_R,
 		Operation: func(c *CPU) uint8 {
-			c.Write(c.Fetched, c.Registers.A)
+			c.bus.Write(c.fetched, c.registers.A)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3502,8 +3502,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A ^= uint8(c.Fetched)
-			c.SetXorFlags(c.Registers.A)
+			c.registers.A ^= uint8(c.fetched)
+			c.SetXorFlags(c.registers.A)
 			return 0
 		},
 	},
@@ -3513,8 +3513,8 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.StackPush16(c.Registers.PC)
-			c.Registers.PC = 0x00EF
+			c.StackPush16(c.registers.PC)
+			c.registers.PC = 0x00EF
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3525,7 +3525,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{12},
 		AddrMode: A_A8,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Read(c.Fetched)
+			c.registers.A = c.bus.Read(c.fetched)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3537,7 +3537,7 @@ var Instructions = [0x0100]Instruction{
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
 			val := c.StackPop16()
-			c.Registers.SetAF(val)
+			c.registers.SetAF(val)
 			return 0
 		},
 	},
@@ -3547,8 +3547,8 @@ var Instructions = [0x0100]Instruction{
 	// 	AddrMode: NONE,
 	// 	Ticks:    []uint8{8},
 	// 	Operation: func(c *CPU) {
-	// 		val := c.Read(uint16(c.Registers.GetReg(registers.C)) + 0xFF00)
-	// 		c.Registers.SetReg(registers.A, val)
+	// 		val := c.bus.Read(uint16(c.registers.GetReg(registers.C)) + 0xFF00)
+	// 		c.registers.SetReg(registers.A, val)
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -3558,7 +3558,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{4},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.IME = false
+			c.registers.IME = false
 			return 0
 		},
 	},
@@ -3569,7 +3569,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: NONE,
 		Operation: func(c *CPU) uint8 {
-			c.StackPush16(c.Registers.GetAF())
+			c.StackPush16(c.registers.GetAF())
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3580,9 +3580,9 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{8},
 	// 	AddrMode: R_N8,
 	// 	Operation: func(c *CPU) {
-	// 		a := c.Registers.GetReg(registers.A)
-	// 		c.Registers.SetReg(registers.A, a|uint8(c.Fetched))
-	// 		c.SetXorFlags(c.Registers.GetReg(registers.A))
+	// 		a := c.registers.GetReg(registers.A)
+	// 		c.registers.SetReg(registers.A, a|uint8(c.Fetched))
+	// 		c.SetXorFlags(c.registers.GetReg(registers.A))
 	// 	},
 	// },
 	// 0xF7: {
@@ -3591,8 +3591,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.StackPush16(c.Registers.GetPC())
-	// 		c.Registers.SetPC(0x0030)
+	// 		c.StackPush16(c.registers.GetPC())
+	// 		c.registers.SetPC(0x0030)
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -3602,7 +3602,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{12},
 	// 	AddrMode: E8,
 	// 	Operation: func(c *CPU) {
-	// 		c.Registers.SetHL(c.Registers.GetSP() + uint16(c.RelAddr))
+	// 		c.registers.SetHL(c.registers.GetSP() + uint16(c.RelAddr))
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -3612,7 +3612,7 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{8},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.Registers.SetSP(c.Registers.GetHL())
+	// 		c.registers.SetSP(c.registers.GetHL())
 	// 	},
 	// },
 	0xFA: {
@@ -3621,7 +3621,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{16},
 		AddrMode: A16_R,
 		Operation: func(c *CPU) uint8 {
-			c.Registers.A = c.Read(c.Fetched)
+			c.registers.A = c.bus.Read(c.fetched)
 			c.cpuCycles(1)
 			return 0
 		},
@@ -3643,7 +3643,7 @@ var Instructions = [0x0100]Instruction{
 		Ticks:    []uint8{8},
 		AddrMode: R_N8,
 		Operation: func(c *CPU) uint8 {
-			c.SetCpFlags(c.Registers.A, uint8(c.Fetched))
+			c.SetCpFlags(c.registers.A, uint8(c.fetched))
 			return 0
 		},
 	},
@@ -3653,8 +3653,8 @@ var Instructions = [0x0100]Instruction{
 	// 	Ticks:    []uint8{16},
 	// 	AddrMode: NONE,
 	// 	Operation: func(c *CPU) {
-	// 		c.StackPush16(c.Registers.GetPC())
-	// 		c.Registers.SetPC(0x0038)
+	// 		c.StackPush16(c.registers.GetPC())
+	// 		c.registers.SetPC(0x0038)
 	// 		c.cpuCycles(1)
 	// 	},
 	// },
@@ -3673,18 +3673,18 @@ var DASH = Instruction{
 func (c *CPU) CBLookUp(highNibble uint8) *uint8 {
 	switch highNibble {
 	case 0x0, 0x8:
-		return &c.Registers.B
+		return &c.registers.B
 	case 0x1, 0x9:
-		return &c.Registers.C
+		return &c.registers.C
 	case 0x2, 0xA:
-		return &c.Registers.D
+		return &c.registers.D
 	case 0x3, 0xB:
-		return &c.Registers.E
+		return &c.registers.E
 	case 0x4, 0xC:
-		return &c.Registers.H
+		return &c.registers.H
 	case 0x5, 0xD:
-		return &c.Registers.L
+		return &c.registers.L
 	default:
-		return &c.Registers.A
+		return &c.registers.A
 	}
 }

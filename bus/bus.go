@@ -1,30 +1,21 @@
 package bus
 
 import (
-	"github.com/phishbacon/gameboygo/apu"
 	"github.com/phishbacon/gameboygo/cart"
-	"github.com/phishbacon/gameboygo/cpu"
 	"github.com/phishbacon/gameboygo/io"
-	"github.com/phishbacon/gameboygo/ppu"
 	"github.com/phishbacon/gameboygo/ram"
 	"github.com/phishbacon/gameboygo/util"
 )
 
 type Bus struct {
-	cpu  *cpu.CPU
-	apu  *apu.APU
-	ppu  *ppu.PPU
 	cart *cart.Cart
 	ram  *ram.RAM
 	io   *io.IO
 	IE   uint8
 }
 
-func NewBus(cpu *cpu.CPU, apu *apu.APU, ppu *ppu.PPU) *Bus {
+func NewBus() *Bus {
 	return &Bus{
-		cpu: cpu,
-		apu: apu,
-		ppu: ppu,
 		ram: ram.NewRam(),
 		io:  new(io.IO),
 	}
