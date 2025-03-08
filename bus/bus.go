@@ -1,13 +1,13 @@
 package bus
 
 import (
-	"goboy/apu"
-	"goboy/cart"
-	"goboy/cpu"
-	"goboy/io"
-	"goboy/ppu"
-	"goboy/ram"
-	"goboy/util"
+	"github.com/phishbacon/gameboygo/apu"
+	"github.com/phishbacon/gameboygo/cart"
+	"github.com/phishbacon/gameboygo/cpu"
+	"github.com/phishbacon/gameboygo/io"
+	"github.com/phishbacon/gameboygo/ppu"
+	"github.com/phishbacon/gameboygo/ram"
+	"github.com/phishbacon/gameboygo/util"
 )
 
 type Bus struct {

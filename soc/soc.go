@@ -2,12 +2,13 @@ package soc
 
 import (
 	"fmt"
-	"goboy/apu"
-	"goboy/bus"
-	"goboy/cpu"
-	"goboy/dbg"
-	"goboy/ppu"
-	"goboy/timer"
+
+	"github.com/phishbacon/gameboygo/apu"
+	"github.com/phishbacon/gameboygo/bus"
+	"github.com/phishbacon/gameboygo/cpu"
+	"github.com/phishbacon/gameboygo/dbg"
+	"github.com/phishbacon/gameboygo/ppu"
+	"github.com/phishbacon/gameboygo/timer"
 )
 
 type ComponentEnum uint8
@@ -19,15 +20,17 @@ const (
 )
 
 type SOC struct {
-	APU        *apu.APU
-	CPU        *cpu.CPU
-	PPU        *ppu.PPU
-	Timer      *timer.Timer
-	Bus        *bus.Bus
-	Running    bool
-	Paused     bool
-	Ticks      uint64
-	TotalSteps uint64
+	APU                     *apu.APU
+	CPU                     *cpu.CPU
+	PPU                     *ppu.PPU
+	Timer                   *timer.Timer
+	Bus                     *bus.Bus
+	Running                 bool
+	Paused                  bool
+	Ticks                   uint64
+	TotalSteps              uint64
+	CpuStateString          string
+	CpuStateReadyForReading bool
 }
 
 func NewSOC() *SOC {
@@ -57,20 +60,22 @@ func (s *SOC) Init() {
 		if s.Paused {
 			continue
 		}
-		s.Step(1)
+		s.CpuStateReadyForReading = false
+		s.CpuStateString = s.Step()
+		fmt.Println(s.CpuStateString)
+		s.CpuStateReadyForReading = true
 		s.TotalSteps++
 		s.Ticks++
 	}
 }
 
-func (s *SOC) Step(steps int) {
-	for i := 0; i < steps; i++ {
-		fmt.Printf("%x: ", s.TotalSteps)
-		s.CPU.Step()
-		s.TotalSteps++
-		dbg.Update(s.Bus.Read, s.Bus.Write)
-		dbg.Print()
-		// s.APU.Step()
-		// s.PPU.Step()
-	}
+func (s *SOC) Step() string {
+	fmt.Printf("%x: ", s.TotalSteps)
+	cpuString := s.CPU.Step()
+	s.TotalSteps++
+	dbg.Update(s.Bus.Read, s.Bus.Write)
+	dbg.Print()
+	// s.APU.Step()
+	// s.PPU.Step()
+	return cpuString
 }

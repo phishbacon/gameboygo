@@ -1,8 +1,6 @@
 package io
 
-import (
-	"goboy/timer"
-)
+import "github.com/phishbacon/gameboygo/timer"
 
 const (
 	VBLANK uint8 = 0b00000001

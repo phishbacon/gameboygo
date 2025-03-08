@@ -4,15 +4,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"goboy/cart"
-	"goboy/display"
-	"goboy/soc"
-	"goboy/util"
 	"os"
 	"runtime"
-	"strconv"
 
-	qt "github.com/mappu/miqt/qt6"
+	rl "github.com/gen2brain/raylib-go/raylib"
+	"github.com/phishbacon/gameboygo/cart"
+	"github.com/phishbacon/gameboygo/soc"
+	"github.com/phishbacon/gameboygo/util"
 )
 
 func init() {
@@ -20,72 +18,24 @@ func init() {
 }
 
 type Goboy struct {
-	soc     *soc.SOC
-	cart    *cart.Cart
-	on      bool
-	display *display.Display
+	soc  *soc.SOC
+	cart *cart.Cart
+	on   bool
 }
 
 func NewGoboy(args []string) *Goboy {
-	qt.NewQApplication(args)
 
 	goboy := &Goboy{}
-	dis := display.NewDisplay()
 	soc := soc.NewSOC()
 	goboy.soc = soc
 	goboy.on = false
-	goboy.display = dis
 
-	dis.Window.Show()
-	dis.Widget.SetFixedWidth(1000)
-	dis.Window.OnCloseEvent(func(super func(event *qt.QCloseEvent), event *qt.QCloseEvent) {
-		goboy.on = false
-		event.Accept() // Allow the window to close (use event.Ignore() to prevent closing)
-		super(event)
-	})
-
-	// Layout the ui
-	btn := qt.NewQPushButton3("Step")
-	stepInput := qt.NewQLineEdit2()
-	btn2 := qt.NewQPushButton3("Pause")
-	currStepValues := qt.NewQPlainTextEdit2()
-	goboy.display.InstrText = currStepValues
-	currStepValues.SetReadOnly(true)
-
-	btn.OnPressed(func() {
-		steps := stepInput.Text()
-		if steps == "" {
-			goboy.soc.Step(1)
-		} else {
-			stepsInt, err := strconv.Atoi(steps)
-			if err != nil {
-				panic(err)
-			}
-			goboy.soc.Step(stepsInt)
-		}
-	})
-	dis.Layout.AddWidget2(btn.QWidget, 0, 0)
-
-	stepInput.SetPlaceholderText("How many?")
-	intValidator := qt.NewQIntValidator2(0, 100)
-	stepInput.SetValidator(intValidator.QValidator)
-	dis.Layout.AddWidget2(stepInput.QWidget, 0, 1)
-
-	btn2.OnPressed(func() {
-		goboy.soc.Paused = !goboy.soc.Paused
-	})
-	dis.Layout.AddWidget2(btn2.QWidget, 1, 0)
-
-	dis.Layout.AddWidget2(currStepValues.QWidget, 3, 0)
-	dis.Layout.SetColumnStretch(0, 3)
-	dis.Layout.SetRowStretch(3, 1)
 	return goboy
 }
 
 func (g *Goboy) Start() {
 	g.on = true
 	go g.soc.Init()
-	qt.QApplication_Exec()
 }
 
 func (g *Goboy) LoadCart(fileName string) {
@@ -143,9 +93,29 @@ func main() {
 		fmt.Println("Failed to verify logo")
 		os.Exit(-1)
 	}
+	rl.InitWindow(1200, 450, "gameboygo")
+	defer rl.CloseWindow()
+	rl.SetTargetFPS(60)
 
 	goboy.Start()
 
-	for goboy.on {
+	for !rl.WindowShouldClose() {
+		if rl.IsKeyPressed(rl.KeyEnter) && goboy.soc.Paused {
+			goboy.soc.Step()
+		}
+
+		if rl.IsKeyPressed(rl.KeySpace) {
+			goboy.soc.Paused = !goboy.soc.Paused
+		}
+		rl.BeginDrawing()
+
+		rl.ClearBackground(rl.RayWhite)
+
+		if goboy.soc.CpuStateReadyForReading {
+			text := goboy.soc.CpuStateString
+			rl.DrawText(text, 10, 0, 30, rl.Black)
+		}
+
+		rl.EndDrawing()
 	}
 }
