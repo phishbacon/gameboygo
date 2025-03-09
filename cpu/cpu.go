@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/phishbacon/gameboygo/bus"
+	"github.com/phishbacon/gameboygo/common"
 	"github.com/phishbacon/gameboygo/io"
 )
 
@@ -12,41 +13,44 @@ const IF uint16 = 0xFF0F
 const IE uint16 = 0xFFFF
 
 type CPU struct {
-	registers *Registers
-	curInst   *Instruction
-	bus       *bus.Bus
+	Registers    *Registers
+	CurInst      *Instruction
+	NextByte     uint8
+	NextNextByte uint8
+	CurOpCode    uint8
+	bus          *bus.Bus
 
-	fetched        uint16
-	paused         bool
-	destAddr       uint16
-	relAddr        int8
-	ticks          uint64
-	prevTicks      uint64
-	halted         bool
-	enablingIME    bool
-	cpuStateString string
+	Fetched        uint16
+	Paused         bool
+	DestAddr       uint16
+	RelAddr        int8
+	Ticks          uint64
+	PrevTicks      uint64
+	Halted         bool
+	EnablingIME    bool
+	CpuStateString string
 }
 
 func NewCPU(bus *bus.Bus) *CPU {
 	registers := new(Registers)
 	return &CPU{
-		registers: registers,
-		bus: bus,
+		Registers: registers,
+		bus:       bus,
 	}
 }
 
 func (c *CPU) Init() {
-	c.registers.SetAF(0x01B0)
-	c.registers.SetBC(0x0000)
-	c.registers.SetDE(0xFF56)
-	c.registers.SetHL(0x000D)
-	c.registers.SP = 0xFFFE
-	c.registers.PC = 0x0100
+	c.Registers.SetAF(0x01B0)
+	c.Registers.SetBC(0x0000)
+	c.Registers.SetDE(0xFF56)
+	c.Registers.SetHL(0x000D)
+	c.Registers.SP = 0xFFFE
+	c.Registers.PC = 0x0100
 }
 
 func (c *CPU) StackPush(value uint8) {
-	c.registers.SP--
-	c.bus.Write(c.registers.SP, value)
+	c.Registers.SP--
+	c.bus.Write(c.Registers.SP, value)
 	c.cpuCycles(1)
 }
 
@@ -58,8 +62,8 @@ func (c *CPU) StackPush16(value uint16) {
 }
 
 func (c *CPU) StackPop() uint8 {
-	poppedValue := c.bus.Read(c.registers.SP)
-	c.registers.SP++
+	poppedValue := c.bus.Read(c.Registers.SP)
+	c.Registers.SP++
 	c.cpuCycles(1)
 	return poppedValue
 }
@@ -72,10 +76,10 @@ func (c *CPU) StackPop16() uint16 {
 	return (hi << 8) | lo
 }
 
-func (c *CPU) execute() string {
-	pc := c.registers.PC
+func (c *CPU) execute() {
+	pc := c.Registers.PC
 	opcode := c.bus.Read(pc)
-	c.prevTicks = c.ticks
+	c.PrevTicks = c.Ticks
 	c.cpuCycles(1)
 	if Instructions[opcode].Operation == nil {
 		fmt.Printf("opcode: %04x not implemented\n", opcode)
@@ -83,86 +87,86 @@ func (c *CPU) execute() string {
 		os.Exit(-1)
 	}
 
-	return c.process(opcode)
+	c.process(opcode)
 }
 
-func (c *CPU) process(opcode uint8) string {
-	c.cpuStateString = ""
-	c.curInst = &Instructions[opcode]
-	pc := c.registers.PC
-	pc1 := c.bus.Read(pc + 1)
-	pc2 := c.bus.Read(pc + 2)
-	c.cpuStateString += fmt.Sprintf("%-10s %02x %02x %02x\t",
-		c.curInst.Mnemonic,
+func (c *CPU) process(opcode uint8) {
+	c.CpuStateString = ""
+	c.CurOpCode = opcode
+	c.CurInst = &Instructions[opcode]
+	pc := c.Registers.PC
+	c.NextByte = c.bus.Read(pc + 1)
+	c.NextNextByte = c.bus.Read(pc + 2)
+	pc1 := c.NextByte
+	pc2 := c.NextNextByte
+	c.CpuStateString += fmt.Sprintf("%-10s %02x %02x %02x\t",
+		c.CurInst.Mnemonic,
 		opcode,
 		pc1,
 		pc2)
-	c.registers.PC++
-	c.curInst.AddrMode(c)
-	ticksIndex := c.curInst.Operation(c)
+	c.Registers.PC++
+	c.CurInst.AddrMode(c)
+	ticksIndex := c.CurInst.Operation(c)
 	var z, n, h, carry string
-	if c.registers.GetFlag(ZERO_FLAG) {
+	if c.Registers.GetFlag(common.ZERO_FLAG) {
 		z = "Z"
 	} else {
 		z = "-"
 	}
-	if c.registers.GetFlag(SUBTRACTION_FLAG) {
+	if c.Registers.GetFlag(common.SUBTRACTION_FLAG) {
 		n = "N"
 	} else {
 		n = "-"
 	}
-	if c.registers.GetFlag(HALF_CARRY_FLAG) {
+	if c.Registers.GetFlag(common.HALF_CARRY_FLAG) {
 		h = "H"
 	} else {
 		h = "-"
 	}
-	if c.registers.GetFlag(CARRY_FLAG) {
+	if c.Registers.GetFlag(common.CARRY_FLAG) {
 		carry = "C"
 	} else {
 		carry = "-"
 	}
-	c.cpuStateString += fmt.Sprintf("A: 0x%02x F: %s%s%s%s BC: 0x%04x DE: 0x%04x HL: 0x%04x PC: 0x%04x SP: 0x%04x SB: 0x%04x SC: 0x%04x\n",
-		c.registers.A,
+	c.CpuStateString += fmt.Sprintf("\nA: 0x%02x\nF: %s%s%s%s\nBC: 0x%04x\nDE: 0x%04x\nHL: 0x%04x\nPC: 0x%04x\nSP: 0x%04x\nSB: 0x%04x\nSC: 0x%04x\n",
+		c.Registers.A,
 		z,
 		n,
 		h,
 		carry,
-		c.registers.GetBC(),
-		c.registers.GetDE(),
-		c.registers.GetHL(),
-		c.registers.PC,
-		c.registers.SP,
+		c.Registers.GetBC(),
+		c.Registers.GetDE(),
+		c.Registers.GetHL(),
+		c.Registers.PC,
+		c.Registers.SP,
 		c.bus.Read(0xFF01),
 		c.bus.Read(0xFF02))
 	// c.Ticks)
-	fmt.Print(c.cpuStateString)
-	if c.prevTicks+uint64(c.curInst.Ticks[ticksIndex]) != c.ticks {
-		fmt.Printf("Ticks before operation: %d, Ticks after %d, Should be %d, exiting", c.prevTicks, c.ticks, c.prevTicks+uint64(c.curInst.Ticks[ticksIndex]))
+	fmt.Print(c.CpuStateString)
+	if c.PrevTicks+uint64(ticks[opcode][ticksIndex]) != c.Ticks {
+		fmt.Printf("Ticks before operation: %d, Ticks after %d, Should be %d, exiting", c.PrevTicks, c.Ticks, c.PrevTicks+uint64(ticks[opcode][ticksIndex]))
 		os.Exit(-1)
 	}
-	return c.cpuStateString
 }
 
-func (c *CPU) Step() string {
-	cpuString := ""
-	if !c.halted {
-		cpuString = c.execute()
+func (c *CPU) Step() {
+	if !c.Halted {
+		c.execute()
 	} else {
 		c.cpuCycles(1)
 		if c.bus.Read(IF)&c.bus.Read(IE) > 0 {
-			c.halted = false
+			c.Halted = false
 		}
 	}
 
-	if c.registers.IME {
+	if c.Registers.IME {
 		c.HandleInterupts()
-		c.enablingIME = false
+		c.EnablingIME = false
 	}
 
-	if c.enablingIME {
-		c.registers.IME = true
+	if c.EnablingIME {
+		c.Registers.IME = true
 	}
-	return cpuString
 }
 
 func (c *CPU) HandleInterupts() {
@@ -185,8 +189,8 @@ func (c *CPU) CheckInterupt(address uint16, inf uint8, ie uint8, interupt uint8)
 	if inf&interupt > 0 && ie&interupt > 0 {
 		c.CallInterupt(address, interupt)
 		c.bus.Write(IF, inf & ^interupt)
-		c.halted = false
-		c.registers.IME = false
+		c.Halted = false
+		c.Registers.IME = false
 		return true
 	}
 
@@ -194,6 +198,6 @@ func (c *CPU) CheckInterupt(address uint16, inf uint8, ie uint8, interupt uint8)
 }
 
 func (c *CPU) CallInterupt(address uint16, interupt uint8) {
-	c.StackPush16(c.registers.PC)
-	c.registers.PC = address
+	c.StackPush16(c.Registers.PC)
+	c.Registers.PC = address
 }

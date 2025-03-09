@@ -8,35 +8,33 @@ import (
 
 	"github.com/jupiterrider/purego-sdl3/sdl"
 	"github.com/phishbacon/gameboygo/cart"
-	"github.com/phishbacon/gameboygo/display"
 	"github.com/phishbacon/gameboygo/soc"
-	"github.com/phishbacon/gameboygo/util"
+	"github.com/phishbacon/gameboygo/common"
 )
 
 type Gameboy struct {
-	soc     *soc.SOC
-	cart    *cart.Cart
-	running bool
-	paused  bool
-	display *display.Display
+	SOC     *soc.SOC
+	Cart    *cart.Cart
+	Running bool
+	Paused  bool
+	Display *Display
 }
 
 func NewGoboy(args []string) *Gameboy {
 
 	goboy := &Gameboy{}
 	soc := soc.NewSOC()
-	display := new(display.Display)
-	goboy.soc = soc
-	goboy.display = display
-	goboy.running = false
+	goboy.SOC = soc
+	goboy.Running = false
 
 	return goboy
 }
 
 func (g *Gameboy) Start() {
-	g.running = true
-	g.display.Start()
-	go g.soc.Init()
+	g.Running = true
+	g.Paused = true
+	g.InitDisplay()
+	go g.SOC.Init()
 }
 
 func (g *Gameboy) LoadCart(fileName string) {
@@ -46,11 +44,11 @@ func (g *Gameboy) LoadCart(fileName string) {
 		os.Exit(-1)
 	}
 	// give bus reference to cart so soc components can read from it
-	g.cart = (*cart.Cart)(&dump)
-	g.soc.ConnectCart(&dump)
+	g.Cart = (*cart.Cart)(&dump)
+	g.SOC.ConnectCart(&dump)
 
 	var cartHeader cart.CartHeader
-	headerErr := binary.Read(bytes.NewReader((*g.cart)[0x0100:0x0150]), binary.LittleEndian, &cartHeader)
+	headerErr := binary.Read(bytes.NewReader((*g.Cart)[0x0100:0x0150]), binary.LittleEndian, &cartHeader)
 	if headerErr != nil {
 		fmt.Print(headerErr)
 		os.Exit(-1)
@@ -67,12 +65,12 @@ func (g *Gameboy) LoadCart(fileName string) {
 
 	var checksum uint8 = 0
 	for address := 0x0134; address <= 0x014C; address++ {
-		checksum = checksum - (*g.cart)[address] - 1
+		checksum = checksum - (*g.Cart)[address] - 1
 	}
 
-	checksumPassed := util.If(cartHeader.HeaderChecksum == (checksum&0x00FF), "PASSED", "FAILED")
+	checksumPassed := common.If(cartHeader.HeaderChecksum == (checksum&0x00FF), "PASSED", "FAILED")
 	fmt.Printf("CHECKSUM   %s\n", checksumPassed)
-	g.cart.DumpHex()
+	g.Cart.DumpHex()
 }
 
 func main() {
@@ -88,7 +86,7 @@ func main() {
 	gameboy.LoadCart(args[1])
 
 	fmt.Printf("Loading %s\n", args[1])
-	if gameboy.cart.VerifyLogoDump() {
+	if gameboy.Cart.VerifyLogoDump() {
 		// jump to address 0x0100
 	} else {
 		fmt.Println("Failed to verify logo")
@@ -98,11 +96,13 @@ func main() {
 	gameboy.Start()
 	sdl.Init(sdl.InitVideo)
 	defer sdl.Quit()
-	defer sdl.DestroyRenderer(gameboy.display.ScreenRenderer)
-	defer sdl.DestroyWindow(gameboy.display.Screen)
-	for gameboy.display.On {
-		gameboy.soc.Paused = gameboy.display.Paused
-		gameboy.display.EventLoop()
-		gameboy.display.Render()
+	defer sdl.DestroyRenderer(gameboy.Display.ScreenRenderer)
+	defer sdl.DestroyWindow(gameboy.Display.Screen)
+	defer sdl.DestroyRenderer(gameboy.Display.DebugScreenRenderer)
+	defer sdl.DestroyWindow(gameboy.Display.DebugScreen)
+	for gameboy.Running {
+		gameboy.EventLoop()
+		gameboy.DebugScreenRender()
+		gameboy.ScreenRender()
 	}
 }

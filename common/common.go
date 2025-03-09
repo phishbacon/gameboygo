@@ -1,8 +1,17 @@
-package util
+package common
 
 import (
 	"fmt"
 	"os"
+)
+
+type FlagMask uint16
+
+const (
+	ZERO_FLAG        FlagMask = 0b10000000
+	SUBTRACTION_FLAG FlagMask = 0b01000000
+	HALF_CARRY_FLAG  FlagMask = 0b00100000
+	CARRY_FLAG       FlagMask = 0b00010000
 )
 
 func NotImplemented() uint8 {
@@ -19,8 +28,9 @@ func WriteNilRegister(address uint16) {
 	os.Exit(-1)
 }
 
-func ReadNilRegister(address uint16) {
-	fmt.Printf("Can't read from %04x\n", address)
+func ReadNilRegister(address uint16) uint8 {
+	// fmt.Printf("Can't read from %04x\n", address)
+	return 0
 }
 
 func Exit() uint8 {
