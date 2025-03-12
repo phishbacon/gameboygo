@@ -8,8 +8,8 @@ import (
 
 	"github.com/jupiterrider/purego-sdl3/sdl"
 	"github.com/phishbacon/gameboygo/cart"
-	"github.com/phishbacon/gameboygo/soc"
 	"github.com/phishbacon/gameboygo/common"
+	"github.com/phishbacon/gameboygo/soc"
 )
 
 type Gameboy struct {

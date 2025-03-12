@@ -1,4 +1,5 @@
 package cpu
+
 type Operation func(c *CPU) uint8
 type AddrMode func(c *CPU)
 
@@ -32,9 +33,9 @@ func NOP(c *CPU) uint8 {
 
 var Instructions = [0x100]Instruction{
 	0x00: {
-		Mnemonic: "NOP",
-		Size: 1,
-		AddrMode: NONE,
+		Mnemonic:  "NOP",
+		Size:      1,
+		AddrMode:  NONE,
 		Operation: NOP,
 	},
 }

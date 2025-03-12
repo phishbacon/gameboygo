@@ -65,7 +65,7 @@ func (b *Bus) Read(address uint16) uint8 {
 	} else if address == 0xFFFF {
 		return b.IE
 	}
-	fmt.Printf("%04x\n", address)	
+	fmt.Printf("%04x\n", address)
 	panic("Trying to read non existent memory")
 }
 
