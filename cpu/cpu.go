@@ -32,7 +32,7 @@ type CPU struct {
 }
 
 func NewCPU(bus *bus.Bus) *CPU {
-	registers := new(Registers)
+	registers := NewRegisters()
 	return &CPU{
 		Registers: registers,
 		bus:       bus,
@@ -40,17 +40,17 @@ func NewCPU(bus *bus.Bus) *CPU {
 }
 
 func (c *CPU) Init() {
-	c.Registers.SetAF(0x01B0)
-	c.Registers.SetBC(0x0000)
-	c.Registers.SetDE(0xFF56)
-	c.Registers.SetHL(0x000D)
-	c.Registers.SP = 0xFFFE
-	c.Registers.PC = 0x0100
+	c.Registers.AF.Equals(0x01B0)
+	c.Registers.BC.Equals(0x0000)
+	c.Registers.DE.Equals(0xFF56)
+	c.Registers.HL.Equals(0x000D)
+	c.Registers.SP.Equals(0xFFFE)
+	c.Registers.PC.Equals(0x0100)
 }
 
 func (c *CPU) StackPush(value uint8) {
-	c.Registers.SP--
-	c.bus.Write(c.Registers.SP, value)
+	c.Registers.SP.Sub(1)
+	c.bus.Write(c.Registers.SP.Value(), value)
 	c.cpuCycles(1)
 }
 
@@ -62,8 +62,8 @@ func (c *CPU) StackPush16(value uint16) {
 }
 
 func (c *CPU) StackPop() uint8 {
-	poppedValue := c.bus.Read(c.Registers.SP)
-	c.Registers.SP++
+	poppedValue := c.bus.Read(c.Registers.SP.Value())
+	c.Registers.SP.Add(1)
 	c.cpuCycles(1)
 	return poppedValue
 }
@@ -77,7 +77,7 @@ func (c *CPU) StackPop16() uint16 {
 }
 
 func (c *CPU) execute() {
-	pc := c.Registers.PC
+	pc := c.Registers.PC.Value()
 	opcode := c.bus.Read(pc)
 	c.PrevTicks = c.Ticks
 	c.cpuCycles(1)
@@ -94,7 +94,7 @@ func (c *CPU) process(opcode uint8) {
 	c.CpuStateString = ""
 	c.CurOpCode = opcode
 	c.CurInst = &Instructions[opcode]
-	pc := c.Registers.PC
+	pc := c.Registers.PC.Value()
 	c.NextByte = c.bus.Read(pc + 1)
 	c.NextNextByte = c.bus.Read(pc + 2)
 	pc1 := c.NextByte
@@ -104,7 +104,7 @@ func (c *CPU) process(opcode uint8) {
 		opcode,
 		pc1,
 		pc2)
-	c.Registers.PC++
+	c.Registers.PC.Add(1)
 	c.CurInst.AddrMode(c)
 	ticksIndex := c.CurInst.Operation(c)
 	var z, n, h, carry string
@@ -129,16 +129,16 @@ func (c *CPU) process(opcode uint8) {
 		carry = "-"
 	}
 	c.CpuStateString += fmt.Sprintf("\nA: 0x%02x\nF: %s%s%s%s\nBC: 0x%04x\nDE: 0x%04x\nHL: 0x%04x\nPC: 0x%04x\nSP: 0x%04x\nSB: 0x%04x\nSC: 0x%04x\n",
-		c.Registers.A,
+		c.Registers.A.Value(),
 		z,
 		n,
 		h,
 		carry,
-		c.Registers.GetBC(),
-		c.Registers.GetDE(),
-		c.Registers.GetHL(),
-		c.Registers.PC,
-		c.Registers.SP,
+		c.Registers.BC.Value(),
+		c.Registers.DE.Value(),
+		c.Registers.HL.Value(),
+		c.Registers.PC.Value(),
+		c.Registers.SP.Value(),
 		c.bus.Read(0xFF01),
 		c.bus.Read(0xFF02))
 	// c.Ticks)
@@ -159,13 +159,13 @@ func (c *CPU) Step() {
 		}
 	}
 
-	if c.Registers.IME {
+	if c.Registers.IME.Value() == 1 {
 		c.HandleInterupts()
 		c.EnablingIME = false
 	}
 
 	if c.EnablingIME {
-		c.Registers.IME = true
+		c.Registers.IME.Equals(1)
 	}
 }
 
@@ -190,7 +190,7 @@ func (c *CPU) CheckInterupt(address uint16, inf uint8, ie uint8, interupt uint8)
 		c.CallInterupt(address, interupt)
 		c.bus.Write(IF, inf & ^interupt)
 		c.Halted = false
-		c.Registers.IME = false
+		c.Registers.IME.Equals(0)
 		return true
 	}
 
@@ -198,6 +198,6 @@ func (c *CPU) CheckInterupt(address uint16, inf uint8, ie uint8, interupt uint8)
 }
 
 func (c *CPU) CallInterupt(address uint16, interupt uint8) {
-	c.StackPush16(c.Registers.PC)
-	c.Registers.PC = address
+	c.StackPush16(c.Registers.PC.Value())
+	c.Registers.PC.Equals(address)
 }

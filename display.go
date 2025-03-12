@@ -112,15 +112,15 @@ func (g *Gameboy) DebugScreenRender() {
 		g.SOC.TotalSteps,
 	)
 	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 11, " A: 0x%02x",
-		cpu.Registers.A,
+		cpu.Registers.A.Value(),
 	)
 	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 21, " F: %s%s%s%s", z, n, h, c)
-	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 31, " F: %08b", cpu.Registers.F)
-	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 41, "BC: 0x%04x", cpu.Registers.GetBC())
-	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 51, "DE: 0x%04x", cpu.Registers.GetDE())
-	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 61, "HL: 0x%04x", cpu.Registers.GetHL())
-	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 71, "PC: 0x%04x", cpu.Registers.PC)
-	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 81, "SP: 0x%04x", cpu.Registers.SP)
+	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 31, " F: %08b", cpu.Registers.F.Value())
+	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 41, "BC: 0x%04x", cpu.Registers.BC.Value())
+	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 51, "DE: 0x%04x", cpu.Registers.DE.Value())
+	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 61, "HL: 0x%04x", cpu.Registers.HL.Value())
+	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 71, "PC: 0x%04x", cpu.Registers.PC.Value())
+	sdl.RenderDebugTextFormat(g.Display.DebugScreenRenderer, 175, 81, "SP: 0x%04x", cpu.Registers.SP.Value())
 	sdl.SetRenderScale(g.Display.DebugScreenRenderer, scale/3, scale/3)
 	var y float32 = 1
 	for i := 0; i < len(memory)-16; i += 16 {

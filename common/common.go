@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-type FlagMask uint16
+type FlagMask uint8
 
 const (
 	ZERO_FLAG        FlagMask = 0b10000000

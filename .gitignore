@@ -3,3 +3,4 @@ dump.txt
 .DS_Store
 individual/
 *.dylib
+*.so.0
